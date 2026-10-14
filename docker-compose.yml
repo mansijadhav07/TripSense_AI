@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: tripsense-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-tripsense_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-tripsense}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-tripsense_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tripsense-network
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: tripsense-api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-tripsense_user}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-tripsense}
+    volumes:
+      - ./apps/api:/app
+      - ./data:/app/data
+      - ./artifacts:/app/artifacts
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - tripsense-network
+
+  # Next.js Frontend (will be added in Task 1.4)
+  # web:
+  #   build:
+  #     context: ./apps/web
+  #     dockerfile: Dockerfile
+  #   container_name: tripsense-web
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: http://localhost:8000
+  #   volumes:
+  #     - ./apps/web:/app
+  #     - /app/node_modules
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - api
+  #   command: npm run dev
+  #   networks:
+  #     - tripsense-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  tripsense-network:
+    driver: bridge
