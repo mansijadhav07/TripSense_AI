@@ -94,8 +94,16 @@ app.include_router(
     tags=["Health"]
 )
 
+# Import auth router
+from routers import auth
+
+app.include_router(
+    auth.router,
+    prefix=f"{settings.api_prefix}/auth",
+    tags=["Authentication"]
+)
+
 # TODO: Register additional routers in subsequent phases
-# app.include_router(auth.router, prefix=settings.api_prefix, tags=["Authentication"])
 # app.include_router(hotels.router, prefix=settings.api_prefix, tags=["Hotels"])
 # app.include_router(recommendations.router, prefix=settings.api_prefix, tags=["Recommendations"])
 # app.include_router(users.router, prefix=settings.api_prefix, tags=["Users"])
