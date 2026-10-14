@@ -44,24 +44,26 @@ services:
     networks:
       - tripsense-network
 
-  # Next.js Frontend (will be added in Task 1.4)
-  # web:
-  #   build:
-  #     context: ./apps/web
-  #     dockerfile: Dockerfile
-  #   container_name: tripsense-web
-  #   environment:
-  #     NEXT_PUBLIC_API_URL: http://localhost:8000
-  #   volumes:
-  #     - ./apps/web:/app
-  #     - /app/node_modules
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - api
-  #   command: npm run dev
-  #   networks:
-  #     - tripsense-network
+  # Next.js Frontend
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      target: base
+    container_name: tripsense-web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    command: npm run dev
+    networks:
+      - tripsense-network
 
 volumes:
   postgres_data:
