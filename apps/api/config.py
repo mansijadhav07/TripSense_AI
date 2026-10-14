@@ -7,6 +7,12 @@ Loads and validates environment variables for the FastAPI application.
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from pathlib import Path
+
+# Find project root (.env location)
+current_dir = Path(__file__).resolve().parent
+project_root = current_dir.parent.parent
+env_file = project_root / ".env"
 
 
 class Settings(BaseSettings):
@@ -73,10 +79,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(env_file),
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore"
+        extra="ignore",
+        protected_namespaces=('settings_',)
     )
     
     def validate_weights(self) -> None:
