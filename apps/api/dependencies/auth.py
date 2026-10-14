@@ -3,6 +3,7 @@ TripSense AI - Authentication Dependencies
 
 FastAPI dependencies for authentication and authorization.
 """
+from typing import Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -68,7 +69,7 @@ async def get_current_user(
 async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
-) -> User | None:
+) -> Optional[User]:
     """
     Get current user if authenticated, None otherwise.
     
