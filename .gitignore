@@ -35,8 +35,10 @@ venv.bak/
 
 # Jupyter Notebooks
 .ipynb_checkpoints
-*.ipynb
 notebooks/.ipynb_checkpoints/
+
+# Allow specific exploration notebooks
+!notebooks/00_dataset_exploration.ipynb
 
 # PyCharm
 .idea/
