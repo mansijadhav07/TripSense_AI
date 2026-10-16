@@ -53,6 +53,17 @@ class HotelDataStore:
                 if path.exists():
                     df = pd.read_parquet(path)
                     logger.info(f"✅ Loaded hotels from {path}: {len(df)} hotels")
+                    
+                    # Validate that hotel_id looks like IDs, not review text
+                    sample_id = str(df["hotel_id"].iloc[0]) if len(df) > 0 else ""
+                    if sample_id and (len(sample_id) > 50 or sample_id.startswith(("-", " ")) or " " in sample_id[:20]):
+                        # Hotel ID looks like text (probably review text) - data corruption detected
+                        logger.warning(f"⚠️  Hotel IDs appear corrupted (sample: {sample_id[:50]}...). Using synthetic data instead.")
+                        self.hotels_df = self._generate_synthetic_hotels()
+                        self._build_hotel_index()
+                        self._loaded = True
+                        return
+                    
                     self.hotels_df = self._normalize_hotel_df(df)
                     self._build_hotel_index()
                     self._loaded = True
@@ -113,9 +124,13 @@ class HotelDataStore:
 
         df["review_count"] = pd.to_numeric(df["review_count"], errors="coerce").fillna(10).astype(int)
 
-        # Add name if missing
-        if "name" not in df.columns:
-            df["name"] = df["hotel_id"].apply(lambda x: f"Hotel {x.replace('hotel_', '').replace('_', ' ').title()}")
+        # Always generate clean hotel names from hotel_id
+        # (The raw data may have review text or other non-name data in the 'name' column)
+        df["name"] = df["hotel_id"].apply(
+            lambda x: f"Hotel {x.replace('hotel_', '').replace('_', ' ').title()}" 
+                      if isinstance(x, str) 
+                      else f"Hotel {x}"
+        )
 
         # Add location if missing
         if "location" not in df.columns:
