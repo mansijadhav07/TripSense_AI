@@ -93,10 +93,16 @@ def standardize_columns(df: DataFrame) -> DataFrame:
     """
     logger.info("Standardizing columns...")
     
-    # Ensure column names are lowercase and snake_case (already are)
-    # Add any necessary computed columns
+    # Ensure post_year and post_month exist
+    df_clean = df
+    if "post_date" in df_clean.columns:
+        clean_date = F.to_date(F.col("post_date"))
+        if "post_year" not in df_clean.columns:
+            df_clean = df_clean.withColumn("post_year", F.year(clean_date))
+        if "post_month" not in df_clean.columns:
+            df_clean = df_clean.withColumn("post_month", F.month(clean_date))
     
-    df_clean = df \
+    df_clean = df_clean \
         .withColumn("review_id", F.monotonically_increasing_id()) \
         .withColumn("ingestion_timestamp", F.current_timestamp())
     
@@ -126,8 +132,9 @@ def validate_ratings(df: DataFrame) -> DataFrame:
         (F.col("overall") >= 1.0) & (F.col("overall") <= 5.0)
     )
     
-    # For aspect ratings, set invalid values to null
-    aspect_cols = ["cleanliness", "value", "location", "rooms", "service", "sleep_quality"]
+    # For aspect ratings, set invalid values to null (only for columns that exist)
+    all_aspects = ["cleanliness", "value", "location", "rooms", "service", "sleep_quality"]
+    aspect_cols = [c for c in all_aspects if c in df_clean.columns]
     
     for col in aspect_cols:
         df_clean = df_clean.withColumn(
@@ -177,21 +184,25 @@ def add_derived_fields(df: DataFrame) -> DataFrame:
     )
     
     # Count of aspect ratings provided
-    aspect_cols = ["cleanliness", "value", "location", "rooms", "service", "sleep_quality"]
-    df_enriched = df_enriched.withColumn(
-        "aspect_count",
-        sum([F.when(F.col(c).isNotNull(), 1).otherwise(0) for c in aspect_cols])
-    )
+    all_aspects = ["cleanliness", "value", "location", "rooms", "service", "sleep_quality"]
+    aspect_cols = [c for c in all_aspects if c in df_enriched.columns]
     
-    # Average of aspect ratings (where available)
-    aspect_sum = sum([F.coalesce(F.col(c), F.lit(0)) for c in aspect_cols])
-    df_enriched = df_enriched.withColumn(
-        "aspect_avg",
-        F.when(
-            F.col("aspect_count") > 0,
-            aspect_sum / F.col("aspect_count")
-        ).otherwise(None)
-    )
+    if aspect_cols:
+        df_enriched = df_enriched.withColumn(
+            "aspect_count",
+            sum([F.when(F.col(c).isNotNull(), 1).otherwise(0) for c in aspect_cols])
+        )
+        aspect_sum = sum([F.coalesce(F.col(c), F.lit(0)) for c in aspect_cols])
+        df_enriched = df_enriched.withColumn(
+            "aspect_avg",
+            F.when(
+                F.col("aspect_count") > 0,
+                aspect_sum / F.col("aspect_count")
+            ).otherwise(None)
+        )
+    else:
+        df_enriched = df_enriched.withColumn("aspect_count", F.lit(0)) \
+                                 .withColumn("aspect_avg", F.lit(None).cast("double"))
     
     # Rating deviation (overall vs aspect average)
     df_enriched = df_enriched.withColumn(

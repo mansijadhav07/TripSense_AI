@@ -1,0 +1,13 @@
+{
+  "train_reviews": 43812,
+  "test_reviews": 10952,
+  "train_interactions": 43812,
+  "test_interactions": 10952,
+  "total_test_reviews": 10952,
+  "cold_start_user_reviews": 3630,
+  "cold_start_hotel_reviews": 10453,
+  "new_user_reviews": 3565,
+  "new_hotel_reviews": 10086,
+  "cold_start_user_pct": 33.14463111760409,
+  "cold_start_hotel_pct": 95.44375456537618
+}

@@ -5,7 +5,6 @@ User's saved/bookmarked hotels for later reference.
 """
 
 from sqlalchemy import Column, String, DateTime, ForeignKey, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -18,17 +17,17 @@ class SavedHotel(Base):
     
     __tablename__ = "saved_hotels"
     
-    # Primary key
+    # Primary key - SQLite compatible String UUID
     id = Column(
-        UUID(as_uuid=True),
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
+        default=lambda: str(uuid.uuid4()),
         nullable=False
     )
     
     # Foreign key
     user_id = Column(
-        UUID(as_uuid=True),
+        String(36),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True
@@ -38,7 +37,7 @@ class SavedHotel(Base):
     hotel_id = Column(String(255), nullable=False, index=True)
     
     # Timestamp
-    saved_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    saved_at = Column(DateTime, server_default=func.now(), nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="saved_hotels")
@@ -50,3 +49,4 @@ class SavedHotel(Base):
     
     def __repr__(self):
         return f"<SavedHotel(user_id={self.user_id}, hotel_id={self.hotel_id})>"
+

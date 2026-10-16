@@ -238,9 +238,9 @@ def split_and_prepare_data(
 
 # Example usage
 if __name__ == "__main__":
-    from spark_setup import create_spark_session, stop_spark_session
     import sys
     sys.path.append('..')
+    from spark_setup import create_spark_session, stop_spark_session
     
     logging.basicConfig(
         level=logging.INFO,
@@ -251,7 +251,7 @@ if __name__ == "__main__":
     
     try:
         # Load cleaned data with text features
-        df = spark.read.parquet("../data/processed/reviews_with_text_features.parquet")
+        df = spark.read.parquet("../data/processed/features/reviews_with_text_features.parquet")
         
         # Split and prepare
         results = split_and_prepare_data(df)

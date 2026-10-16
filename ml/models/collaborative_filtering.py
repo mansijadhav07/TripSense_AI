@@ -108,13 +108,13 @@ class CollaborativeFilteringRecommender:
         logger.info(f"  Hotel IDs: {self.hotel_id_map.count():,}")
         
         # Join reviews with mappings
-        interactions = reviews_df.select("user_id", "hotel_id", "rating") \
+        interactions = reviews_df.select("user_id", "hotel_id", "overall") \
             .join(self.user_id_map, "user_id") \
             .join(self.hotel_id_map, "hotel_id") \
             .select(
                 "user_id_int",
                 "hotel_id_int",
-                F.col("rating").cast("float").alias("rating")
+                F.col("overall").cast("float").alias("rating")
             )
         
         interaction_count = interactions.count()

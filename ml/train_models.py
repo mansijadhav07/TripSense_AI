@@ -49,7 +49,7 @@ def load_data(spark):
     logger.info("LOADING DATA")
     logger.info("="*80)
     
-    data_dir = Path(__file__).parent / "data" / "processed"
+    data_dir = Path(__file__).parent.parent / "data" / "processed"
     features_dir = data_dir / "features"
     
     # Check if data exists

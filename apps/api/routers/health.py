@@ -87,6 +87,7 @@ async def readiness_check(db: Session = Depends(get_db)):
     # checks["models"] = "loaded" if model_service.is_loaded() else "not_loaded"
     
     return {
+        "status": "ready",
         "ready": True,
         "checks": checks,
         "timestamp": datetime.utcnow().isoformat()
@@ -101,6 +102,9 @@ async def info():
     Returns detailed application configuration and runtime information.
     """
     return {
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "environment": settings.environment,
         "application": {
             "name": settings.app_name,
             "version": settings.app_version,

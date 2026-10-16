@@ -36,18 +36,15 @@ class ContentBasedRecommender:
         
         # Feature columns to use
         self.feature_cols = [
-            "avg_cleanliness",
-            "avg_service",
-            "avg_location",
-            "avg_rooms",
-            "avg_value",
+            "hotel_avg_cleanliness",
+            "hotel_avg_service",
+            "hotel_avg_location",
+            "hotel_avg_rooms",
+            "hotel_avg_value",
             "hotel_avg_rating",
             "hotel_review_count_log",
             "pct_5star",
-            "pct_4star",
-            "pct_3star",
-            "pct_2star",
-            "pct_1star",
+            "pct_positive",
             "rating_consistency"
         ]
     
@@ -116,7 +113,7 @@ class ContentBasedRecommender:
         
         # Join reviews with hotel features
         user_hotel_features = reviews_df.select(
-            "user_id", "hotel_id", "rating"
+            "user_id", "hotel_id", "overall"
         ).join(
             hotel_vectors.select("hotel_id", "features_vector"),
             "hotel_id"
@@ -126,7 +123,7 @@ class ContentBasedRecommender:
         # Normalize ratings to 0-1 scale
         user_hotel_weighted = user_hotel_features.withColumn(
             "rating_weight",
-            (F.col("rating") - 1) / 4.0  # 1-5 -> 0-1
+            (F.col("overall") - 1) / 4.0  # 1-5 -> 0-1
         )
         
         # For each user, compute weighted average of hotel feature vectors
@@ -239,9 +236,9 @@ class ContentBasedRecommender:
         logger.info("\n🏨 Sample Hotel Features:")
         self.hotel_vectors.select(
             "hotel_id",
-            "avg_cleanliness",
-            "avg_service",
-            "avg_location",
+            "hotel_avg_cleanliness",
+            "hotel_avg_service",
+            "hotel_avg_location",
             "hotel_avg_rating"
         ).show(5)
         

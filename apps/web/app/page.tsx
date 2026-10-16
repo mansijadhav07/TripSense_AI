@@ -1,119 +1,153 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+  const [destination, setDestination] = useState("");
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const query = destination.trim() ? `?destination=${encodeURIComponent(destination.trim())}` : "";
+    router.push(`/discover${query}`);
+  };
+
+  const models = [
+    {
+      name: "Hybrid Ensemble",
+      tag: "⭐ Production Model",
+      desc: "Dynamically blends ALS collaborative factors, content cosine matching, and sentiment scores based on user sparsity profile.",
+      metric: "NDCG@10: 0.1696",
+      color: "from-cyan-500/20 to-blue-500/20 border-cyan-500/40",
+    },
+    {
+      name: "Collaborative Filtering",
+      tag: "Matrix Factorization",
+      desc: "Apache Spark ALS with 50 latent factors learning subtle interaction patterns from 43,800+ user ratings.",
+      metric: "Recall@10: 17.75%",
+      color: "from-indigo-500/20 to-purple-500/20 border-indigo-500/30",
+    },
+    {
+      name: "Content-Based Matching",
+      tag: "Aspect Vectors",
+      desc: "13-dimensional vector space comparing hotel cleanliness, service quality, room comfort, and value for money.",
+      metric: "Cosine Sim.",
+      color: "from-emerald-500/20 to-teal-500/20 border-emerald-500/30",
+    },
+    {
+      name: "NLP Sentiment Recommender",
+      tag: "Aspect Sentiment",
+      desc: "Aggregated traveler review sentiment, positive-negative polarities, and textual consistency metrics.",
+      metric: "89% Pos. Ratio",
+      color: "from-amber-500/20 to-orange-500/20 border-amber-500/30",
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-slate-900">
-                TripSense AI
-              </h1>
-            </div>
-            <div className="flex gap-4">
-              <Link
-                href="http://localhost:8000/docs"
-                className="text-slate-600 hover:text-slate-900 px-3 py-2 rounded-md text-sm font-medium"
-                target="_blank"
-              >
-                API Docs
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
+    <div className="min-h-screen">
       {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center">
-          <h2 className="text-5xl font-extrabold text-slate-900 mb-4">
-            Travel smarter. Stay better.
-          </h2>
-          <p className="text-xl text-slate-600 mb-8 max-w-2xl mx-auto">
-            AI-powered hotel recommendations tailored to your preferences.
-            Discover your perfect stay with personalized insights.
+      <section className="relative overflow-hidden pt-20 pb-24 border-b border-slate-800/80 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent pointer-events-none"></div>
+
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 mb-6">
+            <span>✨ Phase 5 Complete</span>
+            <span className="text-slate-500">•</span>
+            <span>Serving 50,780 Hotels across 201K+ Reviews</span>
+          </div>
+
+          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white mb-6 leading-tight">
+            AI-Powered Hotel Intelligence <br />
+            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              Tailored to Your Stay Style
+            </span>
+          </h1>
+
+          <p className="text-lg text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            Explainable recommendations powered by distributed Apache Spark ML, alternating least squares matrix factorization, and fine-grained aspect sentiment analysis.
           </p>
-          
-          <div className="flex gap-4 justify-center">
-            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
-              Start Discovering
-            </button>
-            <button className="bg-white text-blue-600 border-2 border-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition">
-              Learn More
-            </button>
-          </div>
-        </div>
 
-        {/* Features */}
-        <div className="mt-24 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-blue-600 text-4xl mb-4">🎯</div>
-            <h3 className="text-xl font-semibold mb-2">Personalized</h3>
-            <p className="text-slate-600">
-              Recommendations based on your unique preferences and travel style
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-blue-600 text-4xl mb-4">🤖</div>
-            <h3 className="text-xl font-semibold mb-2">AI-Powered</h3>
-            <p className="text-slate-600">
-              Multiple recommendation algorithms working together for best results
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="text-blue-600 text-4xl mb-4">📊</div>
-            <h3 className="text-xl font-semibold mb-2">Explainable</h3>
-            <p className="text-slate-600">
-              Clear reasons why each hotel matches your preferences
-            </p>
-          </div>
-        </div>
-
-        {/* Status Section */}
-        <div className="mt-16 bg-white p-8 rounded-lg shadow-md">
-          <h3 className="text-2xl font-bold mb-4 text-center">System Status</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="border-l-4 border-green-500 pl-4">
-              <p className="text-sm text-slate-600">Backend API</p>
-              <p className="text-lg font-semibold text-green-600">✓ Operational</p>
-            </div>
-            <div className="border-l-4 border-green-500 pl-4">
-              <p className="text-sm text-slate-600">Database</p>
-              <p className="text-lg font-semibold text-green-600">✓ Connected</p>
-            </div>
-            <div className="border-l-4 border-blue-500 pl-4">
-              <p className="text-sm text-slate-600">ML Models</p>
-              <p className="text-lg font-semibold text-blue-600">⏳ Phase 3</p>
-            </div>
-            <div className="border-l-4 border-blue-500 pl-4">
-              <p className="text-sm text-slate-600">Recommendations</p>
-              <p className="text-lg font-semibold text-blue-600">⏳ Phase 5</p>
-            </div>
-          </div>
-          <div className="mt-6 text-center">
-            <Link
-              href="http://localhost:8000/docs"
-              target="_blank"
-              className="text-blue-600 hover:text-blue-800 font-medium"
+          {/* Search Box */}
+          <form onSubmit={handleSearch} className="max-w-2xl mx-auto flex flex-col sm:flex-row gap-2 bg-slate-900/90 p-2 rounded-2xl border border-slate-800 shadow-2xl shadow-cyan-500/5">
+            <input
+              type="text"
+              value={destination}
+              onChange={(e) => setDestination(e.target.value)}
+              placeholder="Where are you traveling? (e.g. Paris, Tokyo, London, Rome)..."
+              className="flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2 text-sm"
             >
-              View API Documentation →
-            </Link>
+              <span>Discover Hotels</span>
+              <span>→</span>
+            </button>
+          </form>
+
+          {/* Quick Stats */}
+          <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto">
+            <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+              <div className="text-2xl font-bold text-white">50,780</div>
+              <div className="text-xs text-slate-400">Indexed Properties</div>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+              <div className="text-2xl font-bold text-cyan-400">201,382</div>
+              <div className="text-xs text-slate-400">Verified Reviews</div>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+              <div className="text-2xl font-bold text-indigo-400">5</div>
+              <div className="text-xs text-slate-400">ML Algorithms</div>
+            </div>
+            <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+              <div className="text-2xl font-bold text-emerald-400">&lt;60ms</div>
+              <div className="text-xs text-slate-400">Inference Latency</div>
+            </div>
           </div>
         </div>
-      </main>
+      </section>
 
-      {/* Footer */}
-      <footer className="bg-white border-t mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <p className="text-center text-slate-600">
-            © 2026 TripSense AI. Built with Next.js, FastAPI, and Apache Spark.
+      {/* Model Architecture Section */}
+      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-white">Multi-Algorithm Recommendation Engine</h2>
+          <p className="text-sm text-slate-400 mt-2 max-w-xl mx-auto">
+            Each recommendation is computed through specialized models with full explainability of why each property matches your criteria.
           </p>
         </div>
-      </footer>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {models.map((m) => (
+            <div
+              key={m.name}
+              className={`p-6 rounded-2xl bg-gradient-to-b ${m.color} border backdrop-blur-sm flex flex-col justify-between`}
+            >
+              <div>
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800/80 text-cyan-300 border border-slate-700/50">
+                  {m.tag}
+                </span>
+                <h3 className="text-xl font-bold text-white mt-4">{m.name}</h3>
+                <p className="text-sm text-slate-300 mt-2 leading-relaxed">{m.desc}</p>
+              </div>
+              <div className="mt-6 pt-4 border-t border-slate-700/40 flex items-center justify-between">
+                <span className="text-xs text-slate-400">Benchmark:</span>
+                <span className="text-xs font-mono font-semibold text-cyan-400">{m.metric}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <Link
+            href="/discover"
+            className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl text-sm font-semibold border border-slate-700 transition"
+          >
+            Launch Interactive Recommendation Studio →
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

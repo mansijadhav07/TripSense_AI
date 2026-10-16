@@ -5,6 +5,7 @@ TripSense AI - Utilities Package
 from utils.security import (
     verify_password,
     get_password_hash,
+    hash_password,
     create_access_token,
     decode_access_token
 )
@@ -12,6 +13,7 @@ from utils.security import (
 __all__ = [
     "verify_password",
     "get_password_hash",
+    "hash_password",
     "create_access_token",
     "decode_access_token"
 ]

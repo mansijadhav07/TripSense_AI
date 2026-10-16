@@ -48,3 +48,7 @@ class AuthResponse(BaseModel):
     success: bool = True
     data: dict
     message: Optional[str] = None
+    user: Optional[dict] = None
+    token: Optional[dict] = None
+    access_token: Optional[str] = None
+    token_type: Optional[str] = "bearer"

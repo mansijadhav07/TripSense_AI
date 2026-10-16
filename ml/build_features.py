@@ -5,8 +5,14 @@ Orchestrates building all feature sets for TripSense AI.
 """
 import logging
 import argparse
+import sys
 from pathlib import Path
 from datetime import datetime
+
+# Ensure ml directory is on sys.path
+ml_dir = Path(__file__).resolve().parent
+if str(ml_dir) not in sys.path:
+    sys.path.insert(0, str(ml_dir))
 
 from spark_setup import create_spark_session, stop_spark_session
 from features.user_features import build_user_features
@@ -135,19 +141,35 @@ def main():
     
     args = parser.parse_args()
     
-    # Validate input exists
-    if not Path(args.input).exists():
-        logger.error(f"Input file not found: {args.input}")
-        return 1
+    # Robust input path resolution
+    input_p = Path(args.input)
+    if not input_p.exists():
+        repo_root = Path(__file__).resolve().parent.parent
+        candidates = [
+            repo_root / args.input.lstrip("../"),
+            Path("data/processed/tripadvisor_cleaned.parquet"),
+            Path("../data/processed/tripadvisor_cleaned.parquet"),
+        ]
+        found = next((c for c in candidates if c.exists()), None)
+        if found:
+            input_p = found
+        else:
+            logger.error(f"Input file not found: {args.input}")
+            return 1
     
-    # Create output directory
-    Path(args.output).mkdir(parents=True, exist_ok=True)
+    # Robust output path resolution
+    output_p = Path(args.output)
+    if not output_p.is_absolute() and not output_p.parent.exists():
+        repo_root = Path(__file__).resolve().parent.parent
+        output_p = repo_root / args.output.lstrip("../")
+
+    output_p.mkdir(parents=True, exist_ok=True)
     
     # Run feature engineering
     try:
         run_feature_engineering(
-            input_path=args.input,
-            output_path=args.output
+            input_path=str(input_p),
+            output_dir=str(output_p)
         )
         return 0
     except Exception:

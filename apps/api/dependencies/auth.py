@@ -13,12 +13,14 @@ from database import get_db
 from models.user import User
 from utils.security import decode_access_token
 
-# HTTP Bearer token scheme
-security = HTTPBearer()
+# HTTP Bearer token scheme (required for protected routes)
+security = HTTPBearer(auto_error=False)
+# Optional bearer - does not raise if token is absent
+security_optional = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
     """
@@ -34,6 +36,13 @@ async def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token = credentials.credentials
     
     # Decode token
@@ -46,7 +55,7 @@ async def get_current_user(
         )
     
     # Get user ID from token
-    user_id: str = payload.get("sub")
+    user_id = payload.get("sub")
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -54,8 +63,11 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    # Use user_id directly as string for String UUID columns
+    query_id = str(user_id)
+
     # Get user from database
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.id == query_id).first()
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -67,13 +79,14 @@ async def get_current_user(
 
 
 async def get_current_user_optional(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
     db: Session = Depends(get_db)
 ) -> Optional[User]:
     """
     Get current user if authenticated, None otherwise.
     
     Useful for endpoints that work with or without authentication.
+    Uses auto_error=False so unauthenticated requests are allowed.
     
     Args:
         credentials: Bearer token from request header (optional)
@@ -89,3 +102,7 @@ async def get_current_user_optional(
         return await get_current_user(credentials, db)
     except HTTPException:
         return None
+
+
+# Alias for convenience
+get_optional_user = get_current_user_optional

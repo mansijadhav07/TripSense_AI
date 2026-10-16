@@ -14,23 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 # Define expected schema for TripAdvisor dataset
+# Define expected schema for TripAdvisor dataset matching raw CSV structure
 TRIPADVISOR_SCHEMA = T.StructType([
     T.StructField("hotel_id", T.StringType(), nullable=False),
     T.StructField("user_id", T.StringType(), nullable=False),
-    T.StructField("overall", T.DoubleType(), nullable=False),
+    T.StructField("title", T.StringType(), nullable=True),
     T.StructField("text", T.StringType(), nullable=True),
+    T.StructField("overall", T.DoubleType(), nullable=False),
     T.StructField("cleanliness", T.DoubleType(), nullable=True),
     T.StructField("value", T.DoubleType(), nullable=True),
     T.StructField("location", T.DoubleType(), nullable=True),
     T.StructField("rooms", T.DoubleType(), nullable=True),
-    T.StructField("service", T.DoubleType(), nullable=True),
     T.StructField("sleep_quality", T.DoubleType(), nullable=True),
     T.StructField("stay_year", T.IntegerType(), nullable=True),
-    T.StructField("post_month", T.IntegerType(), nullable=True),
-    T.StructField("post_year", T.IntegerType(), nullable=True),
-    T.StructField("hotel_name", T.StringType(), nullable=True),
-    T.StructField("user_name", T.StringType(), nullable=True),
     T.StructField("post_date", T.StringType(), nullable=True),
+    T.StructField("freq", T.IntegerType(), nullable=True),
+    T.StructField("review", T.StringType(), nullable=True),
+    T.StructField("char", T.IntegerType(), nullable=True),
+    T.StructField("lang", T.StringType(), nullable=True),
 ])
 
 
@@ -50,21 +51,34 @@ def load_raw_data(
     Returns:
         Spark DataFrame with raw data
     """
+    path_obj = Path(data_path)
+    if not path_obj.exists():
+        # Try alternate resolution if called from different cwd
+        candidates = [
+            Path(__file__).resolve().parent.parent.parent / data_path.lstrip("../"),
+            Path(__file__).resolve().parent.parent / data_path.lstrip("../"),
+            Path("data/raw/tripadvisor_reviews.csv"),
+            Path("../data/raw/tripadvisor_reviews.csv"),
+        ]
+        found = next((c for c in candidates if c.exists()), None)
+        if found:
+            data_path = str(found)
+        else:
+            raise FileNotFoundError(f"Data file not found: {data_path}")
+
     logger.info(f"Loading raw data from: {data_path}")
-    
-    # Check file exists
-    if not Path(data_path).exists():
-        raise FileNotFoundError(f"Data file not found: {data_path}")
     
     # Use defined schema or infer
     if schema is None:
         logger.info("Using predefined TripAdvisor schema")
         schema = TRIPADVISOR_SCHEMA
     
-    # Load CSV
+    # Load CSV with multiline and escape options
     df = spark.read.format("csv") \
         .option("header", "true") \
         .option("inferSchema", "false") \
+        .option("multiLine", "true") \
+        .option("escape", "\"") \
         .schema(schema) \
         .load(data_path)
     

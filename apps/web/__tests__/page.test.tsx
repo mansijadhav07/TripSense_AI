@@ -6,30 +6,34 @@ describe('Home Page', () => {
   it('renders the main heading', () => {
     render(<Home />)
     
-    const heading = screen.getByText(/TripSense AI/i)
+    const heading = screen.getByText(/AI-Powered Hotel Intelligence/i)
     expect(heading).toBeInTheDocument()
   })
 
-  it('displays the tagline', () => {
+  it('displays the destination search input and submit button', () => {
     render(<Home />)
     
-    const tagline = screen.getByText(/Smart Hotel Recommendations/i)
-    expect(tagline).toBeInTheDocument()
+    const input = screen.getByPlaceholderText(/Where are you traveling/i)
+    expect(input).toBeInTheDocument()
+
+    const button = screen.getByRole('button', { name: /Discover Hotels/i })
+    expect(button).toBeInTheDocument()
   })
 
-  it('shows feature cards', () => {
+  it('shows production recommendation model cards', () => {
     render(<Home />)
     
-    // Check for feature titles
-    expect(screen.getByText(/Personalized Recommendations/i)).toBeInTheDocument()
-    expect(screen.getByText(/Sentiment Analysis/i)).toBeInTheDocument()
-    expect(screen.getByText(/Multi-Algorithm Approach/i)).toBeInTheDocument()
+    expect(screen.getByText(/Hybrid Ensemble/i)).toBeInTheDocument()
+    expect(screen.getByText(/Collaborative Filtering/i)).toBeInTheDocument()
+    expect(screen.getByText(/Content-Based Matching/i)).toBeInTheDocument()
+    expect(screen.getByText(/NLP Sentiment Recommender/i)).toBeInTheDocument()
   })
 
-  it('displays the API status section', () => {
+  it('displays dataset platform statistics', () => {
     render(<Home />)
     
-    const statusSection = screen.getByText(/System Status/i)
-    expect(statusSection).toBeInTheDocument()
+    expect(screen.getAllByText(/50,780/i).length).toBeGreaterThan(0)
+    expect(screen.getByText(/Indexed Properties/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/201,382/i).length).toBeGreaterThan(0)
   })
 })

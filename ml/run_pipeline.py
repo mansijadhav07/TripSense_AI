@@ -5,8 +5,14 @@ Orchestrates the complete data pipeline from ingestion to cleaned Parquet output
 """
 import logging
 import argparse
+import sys
 from pathlib import Path
 from datetime import datetime
+
+# Ensure ml directory is on sys.path
+ml_dir = Path(__file__).resolve().parent
+if str(ml_dir) not in sys.path:
+    sys.path.insert(0, str(ml_dir))
 
 from spark_setup import create_spark_session, stop_spark_session
 from spark_utils import write_parquet, show_dataframe_info
@@ -130,19 +136,36 @@ def main():
     
     args = parser.parse_args()
     
-    # Validate input exists
-    if not Path(args.input).exists():
-        logger.error(f"Input file not found: {args.input}")
-        return 1
+    # Robust input path resolution
+    input_p = Path(args.input)
+    if not input_p.exists():
+        repo_root = Path(__file__).resolve().parent.parent
+        candidates = [
+            repo_root / args.input.lstrip("../"),
+            Path("data/raw/tripadvisor_reviews.csv"),
+            Path("../data/raw/tripadvisor_reviews.csv"),
+        ]
+        found = next((c for c in candidates if c.exists()), None)
+        if found:
+            input_p = found
+        else:
+            logger.error(f"Input file not found: {args.input}")
+            return 1
     
-    # Create output directory if needed
-    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    # Robust output path resolution
+    output_p = Path(args.output)
+    if not output_p.is_absolute() and not output_p.parent.exists():
+        repo_root = Path(__file__).resolve().parent.parent
+        candidate_parent = repo_root / args.output.lstrip("../")
+        output_p = candidate_parent
+
+    output_p.parent.mkdir(parents=True, exist_ok=True)
     
     # Run pipeline
     try:
         run_data_pipeline(
-            input_path=args.input,
-            output_path=args.output,
+            input_path=str(input_p),
+            output_path=str(output_p),
             skip_quality_report=args.skip_quality
         )
         return 0

@@ -30,7 +30,15 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     
     # CORS
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+    cors_origins: str = "http://localhost:3000,http://localhost:3001"
+    
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parse CORS origins from environment (handles comma-separated or JSON array)."""
+        if isinstance(self.cors_origins, str):
+            # Handle comma-separated string
+            return [origin.strip() for origin in self.cors_origins.split(',') if origin.strip()]
+        return [self.cors_origins]
     
     # Database
     database_url: str
@@ -82,7 +90,7 @@ class Settings(BaseSettings):
         env_file=str(env_file),
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore",
+        extra="allow",
         protected_namespaces=('settings_',)
     )
     

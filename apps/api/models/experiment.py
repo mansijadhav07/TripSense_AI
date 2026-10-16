@@ -1,11 +1,10 @@
 """
-TripSense AI - Model Experiment Model
+TripSense AI - Model Experiment Tracking
 
-Track ML model training experiments and evaluation results.
+Track ML model experiments, parameters, and metrics.
 """
 
 from sqlalchemy import Column, String, DateTime, JSON
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
 
@@ -17,30 +16,26 @@ class ModelExperiment(Base):
     
     __tablename__ = "model_experiments"
     
-    # Primary key
+    # Primary key - SQLite compatible String UUID
     id = Column(
-        UUID(as_uuid=True),
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
+        default=lambda: str(uuid.uuid4()),
         nullable=False
     )
     
-    # Experiment identification
+    # Experiment details
     experiment_name = Column(String(255), nullable=False)
-    model_type = Column(String(50), nullable=False)  # "popularity", "collaborative", "content", "hybrid"
+    model_type = Column(String(50), nullable=False)  # e.g., "collaborative", "content", "hybrid"
     
     # Configuration
-    parameters = Column(JSON, nullable=True)  # Model hyperparameters
-    
-    # Results
-    metrics = Column(JSON, nullable=True)  # Evaluation metrics (precision, recall, NDCG, etc.)
+    parameters = Column(JSON, nullable=True)  # Hyperparameters used
+    metrics = Column(JSON, nullable=True)  # Evaluation metrics (precision, recall, etc.)
     
     # Metadata
     dataset_version = Column(String(50), nullable=True)
-    training_date = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    status = Column(String(50), default="running", nullable=False)  # running, completed, failed
-    
-    # Optional notes
+    training_date = Column(DateTime, server_default=func.now(), nullable=False)
+    status = Column(String(50), nullable=False)  # e.g., "training", "completed", "failed"
     notes = Column(String(1000), nullable=True)
     
     def __repr__(self):

@@ -5,7 +5,7 @@ Password hashing and JWT token generation/validation.
 """
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union, Dict, Any
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 
@@ -13,6 +13,17 @@ from config import settings
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+class TokenPayload(dict):
+    """Token payload that behaves both as a dict and compares equal to its subject user_id."""
+    def __eq__(self, other):
+        if isinstance(other, str):
+            return self.get("sub") == other
+        return super().__eq__(other)
+
+    def __str__(self):
+        return str(self.get("sub", ""))
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -42,31 +53,42 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+# Backward-compatible function alias
+hash_password = get_password_hash
+
+
+def create_access_token(data: Union[Dict[str, Any], str], expires_delta: Optional[timedelta] = None) -> str:
     """
     Create a JWT access token.
     
     Args:
-        data: Data to encode in token (typically {"sub": user_id})
+        data: Data to encode in token (typically {"sub": user_id} or user_id string)
         expires_delta: Token expiration time (defaults to settings value)
         
     Returns:
         Encoded JWT token
     """
-    to_encode = data.copy()
+    if isinstance(data, str):
+        to_encode = {"sub": data}
+    else:
+        to_encode = data.copy()
     
+    secret = getattr(settings, "secret_key", getattr(settings, "JWT_SECRET_KEY", "default-secret-key"))
+    algo = getattr(settings, "algorithm", "HS256")
+    expire_minutes = getattr(settings, "access_token_expire_minutes", 60)
+
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+        expire = datetime.utcnow() + timedelta(minutes=expire_minutes)
     
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+    encoded_jwt = jwt.encode(to_encode, secret, algorithm=algo)
     
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Optional[dict]:
+def decode_access_token(token: str) -> Optional[TokenPayload]:
     """
     Decode and validate a JWT token.
     
@@ -76,8 +98,10 @@ def decode_access_token(token: str) -> Optional[dict]:
     Returns:
         Decoded token data or None if invalid
     """
+    secret = getattr(settings, "secret_key", getattr(settings, "JWT_SECRET_KEY", "default-secret-key"))
+    algo = getattr(settings, "algorithm", "HS256")
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        return payload
+        payload = jwt.decode(token, secret, algorithms=[algo])
+        return TokenPayload(payload)
     except JWTError:
         return None

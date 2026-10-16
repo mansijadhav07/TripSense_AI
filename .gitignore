@@ -1,8 +1,6 @@
-# TripSense AI - Git Ignore File
+# TripSense-AI - Git Ignore
 
-# ============================================
 # Python
-# ============================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -24,196 +22,85 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Virtual Environments
 venv/
-env/
 ENV/
-env.bak/
-venv.bak/
-.venv/
+env/
 
-# Jupyter Notebooks
+# Jupyter Notebook
 .ipynb_checkpoints
-notebooks/.ipynb_checkpoints/
-
-# Allow specific exploration notebooks
-!notebooks/00_dataset_exploration.ipynb
-
-# PyCharm
-.idea/
-
-# VSCode
-.vscode/
-*.code-workspace
-
-# Spyder
-.spyderproject
-.spyproject
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
+*.ipynb
 
 # pytest
 .pytest_cache/
 .coverage
 htmlcov/
 coverage.xml
-*.cover
 
-# ============================================
-# Node.js / Next.js
-# ============================================
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+tripsense.db
+
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+apps/web/build/
+apps/web/dist/
+
+# Node modules
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
 
-# Next.js
-.next/
-out/
-build/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Testing
-coverage/
-.nyc_output/
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
 
-# ============================================
-# Environment Variables & Secrets
-# ============================================
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.key
-*.pem
-*.crt
-*.p12
-secrets/
+# Model artifacts (optional - remove if you want to track them)
+# artifacts/*.pkl
+# artifacts/*.joblib
 
-# Keep example files
-!.env.example
-
-# ============================================
-# Data Files (Large & Sensitive)
-# ============================================
-# Raw datasets
-data/raw/*
-!data/raw/.gitkeep
-
-# Processed data
-data/processed/*
-!data/processed/.gitkeep
-
-# Temporary data
-data/temp/
-data/cache/
-
-# ============================================
-# Model Artifacts & Experiments
-# ============================================
-# Trained models
-artifacts/*
-!artifacts/.gitkeep
-
-# Model checkpoints
-*.ckpt
-*.pt
-*.pth
-*.h5
-*.pkl
-*.joblib
-*.bin
-
-# MLflow / Experiment tracking
-mlruns/
-mlflow/
-
-# TensorBoard
-runs/
-logs/
-tensorboard/
+# Data files (large datasets)
+data/raw/*.csv
+data/raw/*.parquet
+data/processed/*.parquet
 
 # Spark
 spark-warehouse/
 metastore_db/
 derby.log
 
-# ============================================
-# Database
-# ============================================
-*.db
-*.sqlite
-*.sqlite3
-postgres-data/
-
-# ============================================
-# Docker
-# ============================================
-*.log
-docker-compose.override.yml
-
-# ============================================
-# OS Files
-# ============================================
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
-
-# Linux
-*~
-
-# ============================================
-# IDE & Editor
-# ============================================
-*.swp
-*.swo
-*~
-.project
-.classpath
-.settings/
-*.sublime-project
-*.sublime-workspace
-
-# ============================================
-# Testing & QA
-# ============================================
+# Testing
+.tox/
+.coverage.*
+nosetests.xml
 test-results/
-playwright-report/
-.playwright/
 
-# ============================================
-# Documentation Build
-# ============================================
+# Documentation builds
 docs/_build/
 site/
-
-# ============================================
-# Misc
-# ============================================
-*.bak
-*.tmp
-*.temp
-.cache/
-.parcel-cache/
-.turbo/
-
-# Keep important placeholder files
-!.gitkeep

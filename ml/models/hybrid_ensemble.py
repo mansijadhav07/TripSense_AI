@@ -11,10 +11,10 @@ from pyspark.sql import functions as F
 import numpy as np
 
 # Import base models
-from popularity_model import PopularityRecommender
-from collaborative_filtering import CollaborativeFilteringRecommender
-from content_based import ContentBasedRecommender
-from nlp_sentiment import NLPSentimentRecommender
+from .popularity_model import PopularityRecommender
+from .collaborative_filtering import CollaborativeFilteringRecommender
+from .content_based import ContentBasedRecommender
+from .nlp_sentiment import NLPSentimentRecommender
 
 logger = logging.getLogger(__name__)
 

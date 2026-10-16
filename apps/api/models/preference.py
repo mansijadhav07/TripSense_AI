@@ -5,7 +5,6 @@ User preferences for personalized recommendations.
 """
 
 from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -18,17 +17,17 @@ class UserPreference(Base):
     
     __tablename__ = "user_preferences"
     
-    # Primary key
+    # Primary key - SQLite compatible String UUID
     id = Column(
-        UUID(as_uuid=True),
+        String(36),
         primary_key=True,
-        default=uuid.uuid4,
+        default=lambda: str(uuid.uuid4()),
         nullable=False
     )
     
     # Foreign key
     user_id = Column(
-        UUID(as_uuid=True),
+        String(36),
         ForeignKey("users.id", ondelete="CASCADE"),
         unique=True,
         nullable=False,
@@ -57,8 +56,8 @@ class UserPreference(Base):
     travel_style = Column(String(50), nullable=True)  # e.g., "family", "business", "leisure"
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # Relationships
     user = relationship("User", back_populates="preference")
@@ -77,3 +76,4 @@ class UserPreference(Base):
             "value": float(self.value_weight),
             "sleep_quality": float(self.sleep_quality_weight)
         }
+

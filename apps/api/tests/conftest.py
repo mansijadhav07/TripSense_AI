@@ -47,6 +47,11 @@ def db_session(test_engine) -> Generator[Session, None, None]:
     finally:
         session.rollback()
         session.close()
+        # Clean up database tables between tests
+        with test_engine.connect() as conn:
+            for table in reversed(Base.metadata.sorted_tables):
+                conn.execute(table.delete())
+            conn.commit()
 
 
 @pytest.fixture(scope="function")
@@ -70,6 +75,8 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
 def test_settings():
     """Override settings for testing"""
     settings = get_settings()
+    settings.environment = "testing"
+    settings.secret_key = "test-secret-key-for-testing-only"
     settings.ENVIRONMENT = "testing"
     settings.JWT_SECRET_KEY = "test-secret-key-for-testing-only"
     return settings
