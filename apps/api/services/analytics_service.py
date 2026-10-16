@@ -91,12 +91,12 @@ class AnalyticsService:
                     total_users = df[user_col].nunique()
 
             # Rating stats
-            avg_rating = 3.8
-            rating_std = 0.9
+            avg_rating = 4.14
+            rating_std = 1.05
             rating_distribution = []
 
             if df is not None:
-                rating_col = next((c for c in ["rating", "Rating", "avg_rating"] if c in df.columns), None)
+                rating_col = next((c for c in ["overall", "rating", "Rating", "avg_rating"] if c in df.columns), None)
                 if rating_col:
                     ratings = pd.to_numeric(df[rating_col], errors="coerce").dropna()
                     avg_rating = round(float(ratings.mean()), 2)
@@ -134,22 +134,22 @@ class AnalyticsService:
 
         except Exception as e:
             logger.error(f"Error computing dataset stats: {e}")
-            # Return known real values from dataset
+            # Return known real values from actual processed dataset
             return {
-                "total_reviews": 201_853,
+                "total_reviews": 54_764,
                 "total_hotels": 50_780,
-                "total_users": 18_965,
-                "avg_rating": 3.87,
-                "rating_std": 0.94,
-                "sparsity_percent": 99.98,
-                "train_reviews": 161_482,
-                "test_reviews": 40_371,
+                "total_users": 19_531,
+                "avg_rating": 4.14,
+                "rating_std": 1.05,
+                "sparsity_percent": 99.99,
+                "train_reviews": 43_812,
+                "test_reviews": 10_952,
                 "rating_distribution": [
-                    {"rating": "1", "label": "1 Star", "count": 8_100, "percentage": 4.0},
-                    {"rating": "2", "label": "2 Stars", "count": 12_200, "percentage": 6.0},
-                    {"rating": "3", "label": "3 Stars", "count": 24_400, "percentage": 12.1},
-                    {"rating": "4", "label": "4 Stars", "count": 60_800, "percentage": 30.1},
-                    {"rating": "5", "label": "5 Stars", "count": 96_353, "percentage": 47.7},
+                    {"rating": "1", "label": "1 Star", "count": 1_955, "percentage": 3.6},
+                    {"rating": "2", "label": "2 Stars", "count": 2_683, "percentage": 4.9},
+                    {"rating": "3", "label": "3 Stars", "count": 7_398, "percentage": 13.5},
+                    {"rating": "4", "label": "4 Stars", "count": 16_695, "percentage": 30.5},
+                    {"rating": "5", "label": "5 Stars", "count": 26_033, "percentage": 47.5},
                 ],
                 "data_source": "TripAdvisor Hotel Reviews (Kaggle)",
                 "collection_notes": "Real hotel reviews dataset with aspect-level ratings"
@@ -256,9 +256,16 @@ class AnalyticsService:
         if benchmark_path.exists():
             try:
                 with open(benchmark_path) as f:
-                    return json.load(f)
-            except Exception:
-                pass
+                    data = json.load(f)
+                    # Extract the benchmarks array from the nested structure
+                    if isinstance(data, dict) and "benchmarks" in data:
+                        return data["benchmarks"]
+                    elif isinstance(data, list):
+                        return data
+                    else:
+                        logger.warning(f"Unexpected benchmark data structure: {type(data)}")
+            except Exception as e:
+                logger.error(f"Error loading spark benchmarks: {e}")
 
         # Return documented benchmark results
         return [
