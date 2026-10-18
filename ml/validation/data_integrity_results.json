@@ -1,0 +1,134 @@
+{
+  "timestamp": "2026-10-16T21:34:30.668946",
+  "checks_passed": [
+    {
+      "name": "Test Interactions File Exists",
+      "details": "Loaded 10952 interactions"
+    },
+    {
+      "name": "Test Interactions Column: user_id",
+      "details": "Column exists with 10952 non-null values"
+    },
+    {
+      "name": "Test Interactions Column: hotel_id",
+      "details": "Column exists with 10952 non-null values"
+    },
+    {
+      "name": "Test Interactions Column: overall",
+      "details": "Column exists with 10952 non-null values"
+    },
+    {
+      "name": "ID Format Consistency (user_id)",
+      "details": "All 10952 IDs use format: other"
+    },
+    {
+      "name": "ID Format Consistency (hotel_id)",
+      "details": "All 10952 IDs use format: other"
+    },
+    {
+      "name": "Relevant Items (rating >= 4.0)",
+      "details": "8,752 items (79.9% of 10,952 total)"
+    },
+    {
+      "name": "Test Interactions Coverage - Users",
+      "details": "3,633 unique users"
+    },
+    {
+      "name": "Test Interactions Coverage - Hotels",
+      "details": "10,404 unique hotels"
+    },
+    {
+      "name": "Hotel Features File Exists",
+      "details": "Loaded 50780 hotels"
+    },
+    {
+      "name": "ID Format Consistency (hotel_id)",
+      "details": "All 50780 IDs use format: other"
+    },
+    {
+      "name": "Hotel ID Uniqueness",
+      "details": "All 50780 hotel_ids are unique"
+    },
+    {
+      "name": "Numeric Features",
+      "details": "Found 32 numeric feature columns"
+    },
+    {
+      "name": "User Features File Exists",
+      "details": "Loaded 19531 users"
+    },
+    {
+      "name": "User ID Uniqueness",
+      "details": "All 19531 user_ids are unique"
+    },
+    {
+      "name": "Numeric Features",
+      "details": "Found 18 numeric feature columns"
+    },
+    {
+      "name": "Test Users in User Features",
+      "details": "All 3633 test users have features"
+    },
+    {
+      "name": "Test Hotels in Hotel Features",
+      "details": "All 10404 test hotels have features"
+    }
+  ],
+  "checks_failed": [
+    {
+      "name": "ID Corruption Detection (user_id)",
+      "details": "Found 10952 corrupted values"
+    },
+    {
+      "name": "ID Corruption Detection (hotel_id)",
+      "details": "Found 10546 corrupted values"
+    },
+    {
+      "name": "ID Corruption Detection (hotel_id)",
+      "details": "Found 50485 corrupted values"
+    },
+    {
+      "name": "ID Corruption Detection (user_id)",
+      "details": "Found 19528 corrupted values"
+    },
+    {
+      "name": "ID Format Consistency (user_id)",
+      "details": "Mixed formats detected: {'other': 19528, 'numeric': 3}"
+    }
+  ],
+  "warnings": [
+    "Found missing values in features. Max: 100.00%",
+    "user_id has mixed formats: {'other': 19528, 'numeric': 3}"
+  ],
+  "data_quality_metrics": {
+    "test_ratings": {
+      "min": 1.0,
+      "max": 5.0,
+      "mean": 4.18644996347699,
+      "median": 5.0,
+      "std": 1.047640167261769,
+      "count": 10952
+    },
+    "relevant_items": {
+      "count": 8752,
+      "percentage": 79.91234477720964,
+      "total": 10952
+    },
+    "test_interactions": {
+      "total_interactions": 10952,
+      "unique_users": 3633,
+      "unique_hotels": 10404,
+      "sparsity": 0.9997102471650945
+    },
+    "hotel_features": {
+      "total_hotels": 50780,
+      "numeric_features": 32,
+      "all_columns": 33
+    },
+    "user_features": {
+      "total_users": 19531,
+      "numeric_features": 18,
+      "all_columns": 21
+    }
+  }
+}

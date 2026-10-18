@@ -1,0 +1,12 @@
+{
+  "test_interactions": {
+    "total_interactions": 10952,
+    "unique_users": 3633,
+    "unique_hotels": 10404,
+    "users_mapped": 3633,
+    "hotels_mapped": 10404
+  },
+  "hotel_features": {
+    "total_hotels": 50780,
+    "unique_hotels": 10405,
+    "hotels_with_test_mapping": 

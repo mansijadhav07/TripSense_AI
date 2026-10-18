@@ -106,10 +106,10 @@ function DiscoverContent() {
         {/* Model Selector Tabs */}
         <div className="flex flex-wrap bg-slate-900 p-1.5 rounded-xl border border-slate-800 text-xs gap-1">
           {[
-            { id: "hybrid", label: "Hybrid Ensemble" },
-            { id: "collaborative", label: "Collaborative" },
+            { id: "collaborative", label: "Collaborative Filtering" },
             { id: "content", label: "Content-Based" },
-            { id: "popularity", label: "Popularity" },
+            { id: "sentiment", label: "Sentiment Analysis" },
+            { id: "hybrid", label: "Hybrid" },
           ].map((m) => (
             <button
               key={m.id}

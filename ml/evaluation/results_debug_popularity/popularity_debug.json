@@ -1,0 +1,263 @@
+{
+  "timestamp": "2026-10-16T21:47:34.589683",
+  "configuration": {
+    "k": 10,
+    "relevance_threshold": 4.0
+  },
+  "top_hotels_analysis": {
+    "top_10_hotels": [
+      "hotel_000088",
+      "hotel_000104",
+      "hotel_000145",
+      "hotel_000214",
+      "hotel_000108",
+      "hotel_000533",
+      "hotel_000174",
+      "hotel_000181",
+      "hotel_000270",
+      "hotel_000195"
+    ],
+    "users_with_match": 308,
+    "total_users": 2558,
+    "total_matches": 308,
+    "match_percentage": 12.04065676309617
+  },
+  "per_user_analysis": {
+    "users_evaluated": 2558,
+    "precision_mean": 0.01204065676309617,
+    "precision_std": 0.03254999927428298,
+    "recall_mean": 0.1199179046129789,
+    "recall_std": 0.3246656369488407,
+    "hit_rate": 0.12040656763096169,
+    "diagnostics": [
+      {
+        "user_id": "user_000088",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000093",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000105",
+        "relevant_hotels": [
+          "hotel_000104"
+        ],
+        "matches_in_top10": [
+          "hotel_000104"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000108",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000127",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000131",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000134",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000136",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000141",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000146",
+        "relevant_hotels": [
+          "hotel_000104"
+        ],
+        "matches_in_top10": [
+          "hotel_000104"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000147",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000148",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000149",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000159",
+        "relevant_hotels": [
+          "hotel_000145"
+        ],
+        "matches_in_top10": [
+          "hotel_000145"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000165",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000166",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000178",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000181",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000199",
+        "relevant_hotels": [
+          "hotel_000088"
+        ],
+        "matches_in_top10": [
+          "hotel_000088"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      },
+      {
+        "user_id": "user_000200",
+        "relevant_hotels": [
+          "hotel_000181"
+        ],
+        "matches_in_top10": [
+          "hotel_000181"
+        ],
+        "precision": 0.1,
+        "recall": 1.0
+      }
+    ]
+  },
+  "ground_truth_distribution": {
+    "total_unique_relevant": 8384,
+    "mean_frequency": 1.0438931297709924,
+    "median_frequency": 1.0,
+    "max_frequency": 167.0,
+    "overlap_with_top10": 10
+  },
+  "hypothesis": "HYPOTHESIS: Partial mismatch between popularity and preferences. Popularity can contribute to hybrid but with low weight. Recommendation: Use CF as primary, Popularity as weak tie-breaker (15%)."
+}

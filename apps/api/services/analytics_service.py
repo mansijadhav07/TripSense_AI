@@ -167,6 +167,35 @@ class AnalyticsService:
     def _load_evaluation_results(self) -> Dict[str, Any]:
         """Load from evaluation JSON or return documented results."""
         try:
+            # Try loading updated results first (Phase 3-4 complete)
+            json_path = self.evaluation_dir / "model_comparison_updated.json"
+            if json_path.exists():
+                with open(json_path) as f:
+                    data = json.load(f)
+
+                models = []
+                for r in data.get("results", []):
+                    k = data.get("dataset", {}).get("k", 10)
+                    models.append({
+                        "model_name": r.get("model", "Unknown"),
+                        "model_type": r.get("type", "unknown"),
+                        "precision_at_10": round(r.get(f"precision_at_{k}", 0), 4),
+                        "recall_at_10": round(r.get(f"recall_at_{k}", 0), 4),
+                        "ndcg_at_10": round(r.get(f"ndcg_at_{k}", 0), 4),
+                        "map_score": round(r.get("map", 0), 4),
+                        "coverage": round(r.get("coverage", 0), 4),
+                        "hit_rate": round(r.get("hit_rate", 0), 4),
+                        "description": r.get("description", ""),
+                    })
+
+                return {
+                    "models": models,
+                    "evaluation_timestamp": data.get("evaluation_timestamp"),
+                    "dataset": data.get("dataset", {}),
+                    "note": data.get("note", "Metrics reflect comprehensive evaluation with data fixes, baseline reproduction, debugging, and ablations")
+                }
+            
+            # Fall back to original model_comparison.json
             json_path = self.evaluation_dir / "model_comparison.json"
             if json_path.exists():
                 with open(json_path) as f:
