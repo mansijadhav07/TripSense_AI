@@ -3,31 +3,56 @@
 import { useState, useEffect, useTransition, Suspense, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { fetchRecommendations, Recommendation } from "@/lib/api";
+import {
+  fetchRecommendations,
+  fetchPersonas,
+  fetchSavedHotelIds,
+  setHotelSaved,
+  Recommendation,
+  Personalization,
+  Persona,
+  TRAVEL_STYLES,
+} from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
   const initialDestination = searchParams.get("destination") || "";
+  const { token } = useAuth();
 
   const [destination, setDestination] = useState(initialDestination);
-  const [minRating, setMinRating] = useState(3.5);
+  const [minRating, setMinRating] = useState(3.0);
   const [modelType, setModelType] = useState("hybrid");
   const [weights, setWeights] = useState({
-    cleanliness: 1.5,
-    service: 1.2,
+    cleanliness: 1.0,
+    service: 1.0,
     location: 1.0,
     rooms: 1.0,
     value: 1.0,
   });
 
+  const [styles, setStyles] = useState<string[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [persona, setPersona] = useState("");
+  const [personalization, setPersonalization] = useState<Personalization | undefined>();
+
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dataSource, setDataSource] = useState<string | undefined>();
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
   const loadRecs = useCallback(
-    async (destOverride?: string, modelOverride?: string, minRatingOverride?: number, weightsOverride?: any) => {
+    async (
+      destOverride?: string,
+      modelOverride?: string,
+      minRatingOverride?: number,
+      weightsOverride?: typeof weights,
+      stylesOverride?: string[],
+      personaOverride?: string
+    ) => {
       setLoading(true);
       const targetDest = destOverride !== undefined ? destOverride : destination;
       const targetModel = modelOverride !== undefined ? modelOverride : modelType;
@@ -40,48 +65,72 @@ function DiscoverContent() {
           min_rating: targetMinRating,
           model_type: targetModel,
           aspect_weights: targetWeights,
+          travel_styles: stylesOverride !== undefined ? stylesOverride : styles,
+          dataset_user_id: (personaOverride !== undefined ? personaOverride : persona) || undefined,
+          token,
           top_n: 12,
         });
-        setRecommendations(Array.isArray(data) ? data : []);
+        setRecommendations(data.recommendations);
+        setPersonalization(data.personalization);
+        setDataSource(data.data_source);
+        setError(null);
       } catch (e) {
         console.error("Failed to load recommendations:", e);
         setRecommendations([]);
+        setError(e instanceof Error ? e.message : "Recommendations are unavailable.");
       } finally {
         setLoading(false);
       }
     },
-    [destination, minRating, modelType, weights]
+    [destination, minRating, modelType, weights, styles, persona, token]
   );
 
-  // Initial load only - not on every state change
+  // Demo travelers + the logged-in user's saved hotels
   useEffect(() => {
-    loadRecs();
+    fetchPersonas().then((list) => {
+      setPersonas(list);
+      // Anonymous visitors start as a demo traveler so each model visibly personalises.
+      let loggedIn = false;
+      try { loggedIn = !!localStorage.getItem("tripsense_token"); } catch {}
+      if (!loggedIn && list.length) {
+        setPersona(list[0].user_id);
+        loadRecs(undefined, undefined, undefined, undefined, undefined, list[0].user_id);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Sync with searchParams if destination query parameter changes
   useEffect(() => {
-    const urlDest = searchParams.get("destination") || "";
-    if (urlDest !== destination) {
-      setDestination(urlDest);
-      loadRecs(urlDest, modelType, minRating, weights);
-    }
-  }, [searchParams]);
+    if (token) fetchSavedHotelIds(token).then((ids) => setSavedIds(new Set(ids)));
+  }, [token]);
+
+  // Load on mount and whenever the ?destination= query param changes.
+  // Filter state is intentionally read once per navigation, not on every edit.
+  const urlDest = searchParams.get("destination") || "";
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDestination(urlDest);
+    loadRecs(urlDest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlDest, token]);   // token is restored from localStorage after mount: reload so history is used
 
   const handleApplyFilters = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(() => {
-      loadRecs(destination, modelType, minRating, weights);
+      loadRecs(destination, modelType, minRating, weights, styles, persona);
     });
   };
 
   const handleModelChange = (newModel: string) => {
     setModelType(newModel);
     startTransition(() => {
-      loadRecs(destination, newModel, minRating, weights);
+      loadRecs(destination, newModel, minRating, weights, styles, persona);
     });
   };
 
   const toggleSave = (hotelId: string) => {
+    if (token) {
+      setHotelSaved(token, hotelId, !savedIds.has(hotelId)).catch((e) => console.error("save failed", e));
+    }
     setSavedIds((prev) => {
       const next = new Set(prev);
       if (next.has(hotelId)) {
@@ -99,7 +148,7 @@ function DiscoverContent() {
         <div>
           <h1 className="text-3xl font-extrabold text-white">Hotel Recommendation Studio</h1>
           <p className="text-sm text-slate-400 mt-1">
-            Real-time multi-model scoring across 50,780 indexed properties
+            Multi-model hotel ranking with aspect-weighted tuning
           </p>
         </div>
 
@@ -159,6 +208,52 @@ function DiscoverContent() {
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                Travel Style
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {TRAVEL_STYLES.map((t) => {
+                  const on = styles.includes(t);
+                  return (
+                    <button
+                      type="button"
+                      key={t}
+                      onClick={() => setStyles((prev) => (on ? prev.filter((x) => x !== t) : [...prev, t]))}
+                      className={`px-2.5 py-1 rounded-lg text-xs capitalize border transition ${
+                        on
+                          ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                          : "text-slate-400 border-slate-800 hover:text-white"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {personas.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  Browse As Demo Traveler
+                </label>
+                <select
+                  value={persona}
+                  onChange={(e) => setPersona(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                >
+                  <option value="">Me (my preferences & history)</option>
+                  {personas.map((p) => (
+                    <option key={p.user_id} value={p.user_id}>
+                      {p.user_id} · likes {p.favourite_destination}
+                      {p.favourite_styles.length ? ` (${p.favourite_styles.join(", ")})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="pt-4 border-t border-slate-800">
               <h3 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-4">
                 Aspect Importance Weights
@@ -199,11 +294,33 @@ function DiscoverContent() {
 
         {/* Results Grid */}
         <div className="lg:col-span-3">
+          {dataSource === "synthetic-demo" && (
+            <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-300">
+              Demo mode: these hotels are synthetic sample data, not real properties.
+            </div>
+          )}
+          {!loading && !error && personalization && (
+            <div role="status" className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-2 text-xs text-slate-300">
+              {personalization.mode === "dataset_user" &&
+                `Personalized for demo traveler ${persona} using their ${personalization.history_size} reviews (trained SVD factors).`}
+              {personalization.mode === "history" &&
+                `Personalized from your ${personalization.history_size} saved/reviewed hotels${styles.length ? " and your travel style" : ""}.`}
+              {personalization.mode === "preferences" &&
+                "Personalized from your stated preferences (travel style / aspect weights). Save or review hotels to unlock collaborative filtering."}
+              {personalization.mode === "none" &&
+                "Not personalized yet: pick a travel style, adjust aspect weights, or log in and save/review hotels."}
+            </div>
+          )}
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="h-64 rounded-2xl bg-slate-900/40 border border-slate-800 animate-pulse"></div>
               ))}
+            </div>
+          ) : error ? (
+            <div role="alert" className="text-center py-20 bg-slate-900/30 rounded-2xl border border-rose-500/30">
+              <p className="text-lg text-rose-300">Recommendations are unavailable</p>
+              <p className="text-sm text-slate-400 mt-2 max-w-xl mx-auto">{error}</p>
             </div>
           ) : recommendations.length === 0 ? (
             <div className="text-center py-20 bg-slate-900/30 rounded-2xl border border-slate-800">
@@ -219,13 +336,15 @@ function DiscoverContent() {
                     rooms: 1.0,
                     value: 1.0,
                   });
+                  setStyles([]);
+                  setPersona("");
                   loadRecs("", modelType, 1.0, {
                     cleanliness: 1.0,
                     service: 1.0,
                     location: 1.0,
                     rooms: 1.0,
                     value: 1.0,
-                  });
+                  }, [], "");
                 }}
                 className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-xl text-sm transition"
               >

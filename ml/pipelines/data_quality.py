@@ -294,3 +294,24 @@ if __name__ == "__main__":
     finally:
         # Cleanup
         stop_spark_session()
+
+
+def check_item_identity(df, min_reviews_per_item: float = 1.5) -> dict:
+    """
+    Verify ``hotel_id`` really identifies a hotel (items must be reviewed repeatedly).
+
+    Collaborative / content-based recommenders need items that recur across users.
+    If almost every review has its own ``hotel_id``, the column is a review id and
+    no item-level model can be learned or evaluated from the data.
+    """
+    from pyspark.sql import functions as F
+    total, items = df.select(F.count("*"), F.countDistinct("hotel_id")).first()
+    ratio = total / items if items else 0.0
+    ok = ratio >= min_reviews_per_item
+    result = {"reviews": total, "distinct_hotel_ids": items, "reviews_per_hotel_id": round(ratio, 3), "ok": ok}
+    if not ok:
+        logger.error(
+            f"ITEM IDENTITY CHECK FAILED: {items:,} distinct hotel_id for {total:,} reviews "
+            f"({ratio:.2f} reviews/id). hotel_id is not a hotel identifier; item-level models are not trainable."
+        )
+    return result

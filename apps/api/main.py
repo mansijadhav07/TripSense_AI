@@ -13,6 +13,8 @@ import logging
 from config import settings
 from database import engine, Base
 from routers import health
+from fastapi import Depends
+from services.hotel_service import require_catalog
 
 # Configure logging
 logging.basicConfig(
@@ -45,6 +47,19 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Hotel data loaded: {store.total_hotels} hotels")
     except Exception as e:
         logger.warning(f"⚠️  Hotel data pre-load skipped: {e}")
+
+    # Pre-load ML model artifacts (SVD, TF-IDF, Ridge)
+    try:
+        from services.ml_model_loader import get_model_store
+        ms = get_model_store()
+        logger.info(
+            f"✅ ML models loaded: "
+            f"CF-SVD={ms.cf_available}, "
+            f"Content={ms.content_available}, "
+            f"Sentiment={ms.sentiment_available}"
+        )
+    except Exception as e:
+        logger.warning(f"⚠️  ML model pre-load skipped: {e}")
 
     # Pre-load analytics service cache
     try:
@@ -114,6 +129,14 @@ app.include_router(
     tags=["Health"]
 )
 
+# Reviews & sentiment analysis
+from routers import reviews
+app.include_router(
+    reviews.router,
+    prefix=f"{settings.api_prefix}/reviews",
+    tags=["Reviews & Sentiment"]
+)
+
 # Authentication
 from routers import auth
 app.include_router(
@@ -127,7 +150,8 @@ from routers import hotels
 app.include_router(
     hotels.router,
     prefix=f"{settings.api_prefix}/hotels",
-    tags=["Hotels"]
+    tags=["Hotels"],
+    dependencies=[Depends(require_catalog)],
 )
 
 # Recommendations
@@ -135,7 +159,8 @@ from routers import recommendations
 app.include_router(
     recommendations.router,
     prefix=f"{settings.api_prefix}/recommendations",
-    tags=["Recommendations"]
+    tags=["Recommendations"],
+    dependencies=[Depends(require_catalog)],
 )
 
 # Analytics
@@ -177,6 +202,7 @@ async def root():
             "hotels": f"{settings.api_prefix}/hotels",
             "recommendations": f"{settings.api_prefix}/recommendations",
             "analytics": f"{settings.api_prefix}/analytics",
+            "reviews": f"{settings.api_prefix}/reviews",
             "user_preferences": f"{settings.api_prefix}/users/me/preferences",
             "saved_hotels": f"{settings.api_prefix}/users/me/saved-hotels",
         }

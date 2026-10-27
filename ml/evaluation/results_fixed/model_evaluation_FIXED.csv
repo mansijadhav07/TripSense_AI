@@ -1,5 +1,0 @@
-model,type,precision_at_10,recall_at_10,ndcg_at_10,map,num_users_evaluated,hit_rate,coverage,description,data_status,note
-Popularity,non_personalized,0.0,0.0,0.0,0.0,2558,0.0,0.00019692792437967703,Global popularity ranking,corrupted,
-Content-Based,personalized,3.909304143862393e-05,1.981400985231826e-07,3.064826777899739e-05,3.302334975386376e-08,2558,0.00039093041438623924,0.03790862544308783,Cosine similarity between hotel features,corrupted,
-Collaborative Filtering (ALS-SVD),personalized,0.017200938232994525,0.14913481884143,0.13849997139037362,0.1330802219961764,2558,0.15089913995308835,0.0020874359984245764,Matrix factorization with SVD,corrupted,
-Hybrid Ensemble (Fixed),personalized,3.909304143862393e-05,0.00039093041438623924,0.00039093041438623924,0.00039093041438623924,2558,0.00039093041438623924,0.00019692792437967703,"Weighted ensemble: CF(0.35), Content(0.3), Sentiment(0.2), Pop(0.15)",corrupted,FIXED: Now includes Content + Sentiment signals (missing in original)

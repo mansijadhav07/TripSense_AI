@@ -16,7 +16,11 @@ from schemas.recommendation import (
     RecommendationResponse,
     ExplanationResponse,
 )
-from services.recommendation_service import RecommendationService
+from models.preference import UserPreference
+from models.review import Review
+from models.saved_hotel import SavedHotel
+from services.ml_model_loader import ModelUnavailable
+from services.recommendation_service import RecommendationService, SAVED_IMPLICIT_RATING
 
 router = APIRouter()
 
@@ -42,6 +46,7 @@ async def generate_recommendations(
     request: RecommendationRequest,
     current_user: Optional[User] = Depends(get_optional_user),
     service: RecommendationService = Depends(get_recommendation_service),
+    db: Session = Depends(get_db),
 ):
     """
     Generate top-N hotel recommendations.
@@ -52,49 +57,62 @@ async def generate_recommendations(
     - **aspect_weights**: Custom weights for hotel aspects (cleanliness, service, etc.)
     """
     try:
-        user_id = str(current_user.id) if current_user else None
-
-        # Extract filters
-        destination = None
-        min_rating = None
-        max_rating = None
+        destination = min_rating = max_rating = None
         if request.filters:
             destination = request.filters.destination
             min_rating = request.filters.min_rating
             max_rating = request.filters.max_rating
+        aspect_weights = request.aspect_weights.model_dump() if request.aspect_weights else None
 
-        # Extract aspect weights
-        aspect_weights = None
-        if request.aspect_weights:
-            aspect_weights = request.aspect_weights.model_dump()
-
-        # Log the incoming request for debugging
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"Recommendation request: top_n={request.top_n}, model={request.model_type}, "
-                   f"destination={destination}, min_rating={min_rating}, weights={aspect_weights}")
+        history, exclude = {}, set()
+        travel_styles = list(request.travel_styles or [])
+        if current_user:
+            ratings = {}
+            for r in db.query(Review).filter(Review.user_id == current_user.id).all():
+                exclude.add(r.hotel_id)
+                if r.rating:
+                    ratings.setdefault(r.hotel_id, []).append(float(r.rating))
+            history = {h: sum(v) / len(v) for h, v in ratings.items()}
+            for sv in db.query(SavedHotel).filter(SavedHotel.user_id == current_user.id).all():
+                history.setdefault(sv.hotel_id, SAVED_IMPLICIT_RATING)
+            pref = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
+            if pref and pref.travel_style and not travel_styles:
+                travel_styles = [pref.travel_style]
 
         result = service.generate_recommendations(
             top_n=request.top_n,
-            user_id=user_id,
+            user_id=request.dataset_user_id,
+            history=history,
+            exclude_ids=exclude,
             destination=destination,
             min_rating=min_rating,
             max_rating=max_rating,
             aspect_weights=aspect_weights,
+            travel_styles=travel_styles,
             model_type=request.model_type or "hybrid",
         )
-
         return RecommendationResponse(
             success=True,
             data=result,
             message=f"Generated {len(result.get('recommendations', []))} recommendations"
         )
-
+    except ModelUnavailable as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Recommendation service error: {str(e)}"
         )
+
+
+@router.get("/personas", summary="Demo personas (real dataset users)")
+async def personas(service: RecommendationService = Depends(get_recommendation_service)):
+    try:
+        return {"success": True, "data": service.list_personas(), "message": "Dataset users usable as dataset_user_id"}
+    except ModelUnavailable as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
 
 
 @router.get(

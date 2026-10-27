@@ -60,8 +60,8 @@ export default function LoginPage() {
       setTimeout(() => {
         router.push("/discover");
       }, 700);
-    } catch (err: any) {
-      setError(err.message || "Login failed. Please check credentials or register.");
+    } catch (err: unknown) {
+      setError((err instanceof Error && err.message) || "Login failed. Please check credentials or register.");
     } finally {
       setLoading(false);
     }

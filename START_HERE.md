@@ -4,22 +4,19 @@
 
 ---
 
-## 🎯 Quick Start (2 Steps)
+## 🎯 Quick Start
 
-### Step 1: Start Backend (Terminal 1)
 ```bash
-cd apps/api
-python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+# 1. (once) generate data + train + evaluate: ~2 min, seeded and reproducible
+python ml/scripts/generate_synthetic_dataset.py
+python ml/scripts/train_and_evaluate.py
 
-### Step 2: Start Frontend (Terminal 2)
-```bash
-cd apps/web
-npm run dev
-```
+# 2. Backend (Terminal 1)
+cd apps/api && python3 -m uvicorn main:app --reload --port 8000
 
-### Step 3: Open Browser
-Visit: **http://localhost:3000**
+# 3. Frontend (Terminal 2)
+cd apps/web && npm install && npm run dev       # http://localhost:3000
+```
 
 ---
 
@@ -33,15 +30,15 @@ Visit: **http://localhost:3000**
 
 ---
 
-## ✅ What's Working
+## ✅ What's Working (each item covered by an automated test or a recorded browser run)
 
-✅ **Authentication** - Signup and signin work perfectly  
-✅ **Demo Login** - Click "Quick Demo Account" button  
-✅ **Filters** - Update destination and rating instantly  
-✅ **Models** - Switch between Hybrid, Content, Popularity, Collaborative  
-✅ **Aspect Weights** - Tune cleanliness, service, location priorities  
-✅ **Real-time Updates** - Everything updates immediately  
-✅ **50,780 Hotels** - Full dataset indexed  
+✅ **Auth** - signup / signin / demo account  
+✅ **Collaborative filtering (SVD)** - demo travelers use trained factors; your saved/reviewed hotels are folded in  
+✅ **Content-based** - travel style + aspect weights + history  
+✅ **Sentiment analysis** - write a review on a hotel page  
+✅ **Hybrid** - tuned blend, per-hotel contribution shown  
+✅ **Analytics** - held-out metrics + leakage checks from the pipeline  
+ℹ️ Data is synthetic; see README → Known limitations  
 
 ---
 
@@ -59,7 +56,7 @@ Visit: **http://localhost:3000**
 Once backend starts, you should see:
 ```
 ✅ Database tables created
-✅ Hotel data loaded: 50780 hotels  
+✅ Hotel data loaded: 500 hotels  
 ✅ Analytics service initialized
 ✅ Application startup complete
 ```

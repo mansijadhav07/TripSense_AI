@@ -18,7 +18,7 @@ from spark_setup import create_spark_session, stop_spark_session
 from spark_utils import write_parquet, show_dataframe_info
 from pipelines.data_ingestion import ingest_tripadvisor_data
 from pipelines.data_cleaning import clean_tripadvisor_data
-from pipelines.data_quality import generate_quality_report
+from pipelines.data_quality import generate_quality_report, check_item_identity
 
 # Set up logging
 logging.basicConfig(
@@ -35,7 +35,8 @@ logger = logging.getLogger(__name__)
 def run_data_pipeline(
     input_path: str,
     output_path: str,
-    skip_quality_report: bool = False
+    skip_quality_report: bool = False,
+    strict: bool = False,
 ):
     """
     Run complete data pipeline.
@@ -67,6 +68,10 @@ def run_data_pipeline(
         df_clean = clean_tripadvisor_data(df_raw)
         logger.info(f"✅ Cleaned to {df_clean.count():,} records")
         
+        identity = check_item_identity(df_clean)
+        if strict and not identity["ok"]:
+            raise RuntimeError(f"Item identity check failed: {identity}")
+
         # Stage 3: Quality Report
         if not skip_quality_report:
             logger.info("\n🔄 Stage 3/4: Quality Report")
@@ -129,6 +134,11 @@ def main():
     )
     
     parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail if hotel_id does not identify hotels (reviews per id < 1.5)"
+    )
+    parser.add_argument(
         "--skip-quality",
         action="store_true",
         help="Skip quality report generation"
@@ -166,7 +176,8 @@ def main():
         run_data_pipeline(
             input_path=str(input_p),
             output_path=str(output_p),
-            skip_quality_report=args.skip_quality
+            skip_quality_report=args.skip_quality,
+            strict=args.strict,
         )
         return 0
     except Exception:

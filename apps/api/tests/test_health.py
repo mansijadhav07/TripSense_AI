@@ -43,3 +43,14 @@ def test_info_endpoint(client: TestClient):
     assert "version" in data
     assert "environment" in data
     assert data["name"] == "TripSense AI"
+
+
+@pytest.mark.unit
+def test_ready_returns_503_when_database_down(client: TestClient, db_session, monkeypatch):
+    """A failing DB must produce a real HTTP 503, not a 200 with a tuple body."""
+    def boom(*a, **k):
+        raise RuntimeError("db down")
+    monkeypatch.setattr(db_session, "execute", boom)
+    response = client.get("/ready")
+    assert response.status_code == 503
+    assert response.json()["ready"] is False

@@ -29,3 +29,8 @@ alembic.ini
 # Local data
 *.db
 *.sqlite
+.pytest_cache/
+htmlcov/
+coverage.xml
+*.db
+.env

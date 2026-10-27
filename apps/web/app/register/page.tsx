@@ -54,8 +54,8 @@ export default function RegisterPage() {
       setTimeout(() => {
         router.push("/discover");
       }, 700);
-    } catch (err: any) {
-      setError(err.message || "Failed to create account. Email may already be in use.");
+    } catch (err: unknown) {
+      setError((err instanceof Error && err.message) || "Failed to create account. Email may already be in use.");
     } finally {
       setLoading(false);
     }

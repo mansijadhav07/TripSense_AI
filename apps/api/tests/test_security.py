@@ -76,3 +76,16 @@ def test_token_expiration(test_settings):
     decoded = decode_access_token(token)
     
     assert decoded is None
+
+
+def test_production_rejects_placeholder_secret():
+    import pytest
+    from config import Settings
+    base = dict(database_url="sqlite://", environment="production")
+    with pytest.raises(ValueError):
+        Settings(secret_key="CHANGEME_GENERATE_SECURE_KEY_HERE", **base).validate_production_security()
+    with pytest.raises(ValueError):
+        Settings(secret_key="short", **base).validate_production_security()
+    with pytest.raises(ValueError):
+        Settings(secret_key="x" * 40, allow_synthetic_data=True, **base).validate_production_security()
+    Settings(secret_key="x" * 40, **base).validate_production_security()

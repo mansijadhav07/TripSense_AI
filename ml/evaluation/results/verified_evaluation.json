@@ -1,0 +1,112 @@
+{
+  "evaluated_at": "2026-10-27T13:38:29+00:00",
+  "protocol": {
+    "split": "chronological 80/20 by post_date",
+    "k": 10,
+    "relevance_threshold": 4.0,
+    "fit_on": "train only",
+    "seen_items_excluded": true,
+    "seed": 42,
+    "train_rows": 161036,
+    "test_rows": 40259
+  },
+  "data_integrity": {
+    "rows": 201295,
+    "distinct_hotel_id": 201295,
+    "distinct_user_id": 167027,
+    "reviews_per_hotel_id_mean": 1.0,
+    "hotel_id_is_unique_per_row": true
+  },
+  "dataset_summary": {
+    "total_reviews": 201295,
+    "total_users": 167027,
+    "distinct_hotel_ids": 201295,
+    "avg_rating": 4.063,
+    "rating_std": 1.068,
+    "sparsity_percent": 99.9994,
+    "date_range": {
+      "start": "2012-01-01",
+      "end": "2012-12-20"
+    },
+    "rating_distribution": [
+      {
+        "rating": "1",
+        "count": 8045,
+        "percentage": 4.0
+      },
+      {
+        "rating": "2",
+        "count": 10786,
+        "percentage": 5.4
+      },
+      {
+        "rating": "3",
+        "count": 28216,
+        "percentage": 14.0
+      },
+      {
+        "rating": "4",
+        "count": 67732,
+        "percentage": 33.6
+      },
+      {
+        "rating": "5",
+        "count": 86516,
+        "percentage": 43.0
+      }
+    ],
+    "train_reviews": 161036,
+    "test_reviews": 40259
+  },
+  "ranking_feasibility": {
+    "train_catalogue_items": 161036,
+    "test_reviews": 40259,
+    "test_reviews_with_item_in_train": 0.0,
+    "test_reviews_with_user_in_train": 0.16192652574579597,
+    "users_with_relevant_test_items": 28464,
+    "evaluable_users": 0
+  },
+  "ranking_models": {
+    "popularity": {
+      "precision_at_10": null,
+      "recall_at_10": null,
+      "ndcg_at_10": null,
+      "hit_rate": null,
+      "status": "not_evaluable",
+      "reason": "No test user has a relevant item that also exists in the training catalogue (and a training history), so item-ranking models cannot be evaluated."
+    },
+    "collaborative_filtering": {
+      "precision_at_10": null,
+      "recall_at_10": null,
+      "ndcg_at_10": null,
+      "hit_rate": null,
+      "status": "not_evaluable",
+      "reason": "No test user has a relevant item that also exists in the training catalogue (and a training history), so item-ranking models cannot be evaluated."
+    },
+    "content_based": {
+      "precision_at_10": null,
+      "recall_at_10": null,
+      "ndcg_at_10": null,
+      "hit_rate": null,
+      "status": "not_evaluable",
+      "reason": "No test user has a relevant item that also exists in the training catalogue (and a training history), so item-ranking models cannot be evaluated."
+    },
+    "hybrid": {
+      "precision_at_10": null,
+      "recall_at_10": null,
+      "ndcg_at_10": null,
+      "hit_rate": null,
+      "status": "not_evaluable",
+      "reason": "No test user has a relevant item that also exists in the training catalogue (and a training history), so item-ranking models cannot be evaluated."
+    }
+  },
+  "sentiment_text_model": {
+    "task": "predict overall rating from review text (TF-IDF + Ridge, fit on train only)",
+    "test_reviews": 40259,
+    "rmse": 0.6100711256643547,
+    "mae": 0.4664187323166565,
+    "auc_rating_ge_4": 0.9521555444642592,
+    "baseline_global_mean_rmse": 1.0768776494176555,
+    "baseline_global_mean_mae": 0.8105529396183532
+  }
+}

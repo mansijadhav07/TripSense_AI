@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from functools import lru_cache
 
+from fastapi import HTTPException, status
+
 logger = logging.getLogger(__name__)
+
+CATALOG_COLUMNS = ["hotel_id", "name", "location", "avg_rating", "review_count"]
 
 
 class HotelDataStore:
@@ -25,6 +29,7 @@ class HotelDataStore:
         self.data_dir = Path(data_dir) if data_dir else self._find_data_dir()
         self.hotels_df: Optional[pd.DataFrame] = None
         self.hotel_index: Dict[str, Dict] = {}
+        self.data_source = "unavailable"
         self._load_hotels()
 
     def _find_data_dir(self) -> Path:
@@ -39,45 +44,44 @@ class HotelDataStore:
                 return path
         return candidates[0]
 
+    @staticmethod
+    def _looks_like_ids(df: pd.DataFrame) -> bool:
+        """True only if hotel_id values look like identifiers (short, no spaces, repeated across reviews)."""
+        ids = df["hotel_id"].astype(str)
+        sample = ids.head(200)
+        return not (sample.str.len().gt(50).any() or sample.str.contains(" ").any() or sample.str.startswith(("-", '"')).any())
+
+    def _use_fallback(self, reason: str) -> None:
+        from config import settings
+        if settings.allow_synthetic_data:
+            logger.warning(f"{reason} ALLOW_SYNTHETIC_DATA=true -> serving SYNTHETIC demo hotels.")
+            self.hotels_df = self._generate_synthetic_hotels()
+            self.data_source = "synthetic-demo"
+        else:
+            logger.error(f"{reason} No hotel catalogue is available; catalogue endpoints will return 503.")
+            self.hotels_df = pd.DataFrame(columns=CATALOG_COLUMNS)
+            self.data_source = "unavailable"
+        self._build_hotel_index()
+        self._loaded = self.data_source != "unavailable"
+
     def _load_hotels(self) -> None:
-        """Load hotel data from parquet files."""
+        """Load the hotel catalogue; never silently substitute synthetic data."""
         try:
-            # Try different file paths
-            candidates = [
-                self.data_dir / "features" / "hotel_features_complete.parquet",
-                self.data_dir / "features" / "hotel_features.parquet",
-                self.data_dir / "tripadvisor_cleaned.parquet",
-            ]
-
-            for path in candidates:
-                if path.exists():
-                    df = pd.read_parquet(path)
-                    logger.info(f"✅ Loaded hotels from {path}: {len(df)} hotels")
-                    
-                    # Validate that hotel_id looks like IDs, not review text
-                    sample_id = str(df["hotel_id"].iloc[0]) if len(df) > 0 else ""
-                    if sample_id and (len(sample_id) > 50 or sample_id.startswith(("-", " ")) or " " in sample_id[:20]):
-                        # Hotel ID looks like text (probably review text) - data corruption detected
-                        logger.warning(f"⚠️  Hotel IDs appear corrupted (sample: {sample_id[:50]}...). Using synthetic data instead.")
-                        self.hotels_df = self._generate_synthetic_hotels()
-                        self._build_hotel_index()
-                        self._loaded = True
-                        return
-                    
-                    self.hotels_df = self._normalize_hotel_df(df)
-                    self._build_hotel_index()
-                    self._loaded = True
-                    return
-
-            logger.warning("No hotel data files found. Using synthetic data.")
-            self.hotels_df = self._generate_synthetic_hotels()
-            self._build_hotel_index()
-            self._loaded = True
-
+            for name in ("features/hotel_features_complete.parquet", "features/hotel_features.parquet"):
+                path = self.data_dir / name
+                if not path.exists():
+                    continue
+                df = pd.read_parquet(path)
+                if df.empty or "hotel_id" not in df.columns or not self._looks_like_ids(df):
+                    return self._use_fallback(f"{path} does not contain valid hotel identifiers.")
+                self.hotels_df = self._normalize_hotel_df(df)
+                self.data_source = "pipeline"
+                self._build_hotel_index()
+                self._loaded = True
+                return
+            self._use_fallback("No hotel feature files found.")
         except Exception as e:
-            logger.error(f"Failed to load hotel data: {e}")
-            self.hotels_df = self._generate_synthetic_hotels()
-            self._build_hotel_index()
+            self._use_fallback(f"Failed to load hotel data ({e}).")
 
     def _normalize_hotel_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """Normalize column names and types."""
@@ -124,13 +128,9 @@ class HotelDataStore:
 
         df["review_count"] = pd.to_numeric(df["review_count"], errors="coerce").fillna(10).astype(int)
 
-        # Always generate clean hotel names from hotel_id
-        # (The raw data may have review text or other non-name data in the 'name' column)
-        df["name"] = df["hotel_id"].apply(
-            lambda x: f"Hotel {x.replace('hotel_', '').replace('_', ' ').title()}" 
-                      if isinstance(x, str) 
-                      else f"Hotel {x}"
-        )
+        # Use catalogue names; only synthesise one if the source has no usable name column
+        if "name" not in df.columns or df["name"].isna().all() or df["name"].astype(str).str.len().gt(80).any():
+            df["name"] = df["hotel_id"].apply(lambda x: f"Hotel {x.replace('hotel_', '').replace('_', ' ').title()}")
 
         # Add location if missing
         if "location" not in df.columns:
@@ -248,37 +248,25 @@ class HotelDataStore:
         return self.hotel_index.get(hotel_id)
 
     def get_similar(self, hotel_id: str, top_n: int = 5) -> List[Dict]:
-        """Get similar hotels using feature similarity."""
-        if self.hotels_df is None or hotel_id not in self.hotel_index:
+        """Hotels closest in the content model's feature space (review text, destination, style, aspects)."""
+        if hotel_id not in self.hotel_index:
             return []
-
-        feature_cols = [c for c in ["avg_rating", "review_count", "cleanliness", "service", "location_score", "rooms", "value"]
-                        if c in self.hotels_df.columns]
-
-        if not feature_cols:
-            return list(self.hotel_index.values())[:top_n]
-
-        hotel_ids = self.hotels_df["hotel_id"].astype(str).tolist()
-        if hotel_id not in hotel_ids:
+        try:
+            from services.ml_model_loader import get_model_store
+            cm = get_model_store().require().content
+        except Exception:
             return []
-
-        matrix = self.hotels_df[feature_cols].fillna(0).values.astype(float)
-        norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-        norms[norms == 0] = 1
-        matrix = matrix / norms
-
-        idx = hotel_ids.index(hotel_id)
-        similarities = matrix @ matrix[idx]
-        sorted_indices = np.argsort(similarities)[::-1]
-
-        similar = []
-        for i in sorted_indices:
-            if hotel_ids[i] != hotel_id:
-                similar.append(self._row_to_dict(self.hotels_df.iloc[i]))
-                if len(similar) >= top_n:
+        if hotel_id not in cm.hotel_idx:
+            return []
+        sims = cm.Vn @ cm.Vn[cm.hotel_idx[hotel_id]]
+        out = []
+        for j in np.argsort(-sims):
+            other = cm.hotel_ids[j]
+            if other != hotel_id and other in self.hotel_index:
+                out.append({**self.hotel_index[other], "similarity": round(float(sims[j]), 4)})
+                if len(out) >= top_n:
                     break
-
-        return similar
+        return out
 
     def get_popular(self, top_n: int = 10) -> List[Dict]:
         """Get most popular hotels."""
@@ -319,6 +307,18 @@ class HotelDataStore:
 
 # Module-level singleton
 _hotel_store: Optional[HotelDataStore] = None
+
+
+def require_catalog() -> None:
+    """FastAPI dependency: 503 when no valid hotel catalogue is loaded."""
+    store = get_hotel_store()
+    if not store.is_loaded:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Hotel catalogue unavailable: the processed data has no valid hotel identifiers. "
+                   "Run the pipeline on a dataset with real hotel IDs (see README), or set "
+                   "ALLOW_SYNTHETIC_DATA=true for a clearly-labelled demo.",
+        )
 
 
 def get_hotel_store() -> HotelDataStore:

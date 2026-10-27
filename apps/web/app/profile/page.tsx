@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
+import { setHotelSaved } from "@/lib/api";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface SavedHotel {
   hotel_id: string;
@@ -11,39 +14,8 @@ interface SavedHotel {
   destination: string;
   avg_rating: number;
   review_count: number;
-  match_percentage: number;
   saved_at: string;
 }
-
-const DEMO_SAVED: SavedHotel[] = [
-  {
-    hotel_id: "hotel_1",
-    hotel_name: "Grand Palace Hotel Paris",
-    destination: "Paris",
-    avg_rating: 4.8,
-    review_count: 1820,
-    match_percentage: 95,
-    saved_at: "2026-10-14",
-  },
-  {
-    hotel_id: "hotel_3",
-    hotel_name: "The Landmark Suites New York",
-    destination: "New York",
-    avg_rating: 4.6,
-    review_count: 4102,
-    match_percentage: 91,
-    saved_at: "2026-10-13",
-  },
-  {
-    hotel_id: "hotel_5",
-    hotel_name: "Metropolis Executive Tower Tokyo",
-    destination: "Tokyo",
-    avg_rating: 4.4,
-    review_count: 738,
-    match_percentage: 87,
-    saved_at: "2026-10-12",
-  },
-];
 
 const STAT_CARDS = [
   { label: "Hotels Saved", icon: "♥", colorClass: "text-rose-400", bg: "bg-rose-500/10 border-rose-500/20", key: "saved" },
@@ -54,22 +26,40 @@ const STAT_CARDS = [
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, token, isAuthenticated, logout } = useAuth();
   const [saved, setSaved] = useState<SavedHotel[]>([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate loading saved hotels
-    const timer = setTimeout(() => {
-      setSaved(DEMO_SAVED);
+    if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
-    }, 700);
-    return () => clearTimeout(timer);
-  }, []);
+      return;
+    }
+    fetch(`${API_BASE_URL}/api/v1/users/me/saved-hotels`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((json) =>
+        setSaved(
+          (json.data ?? []).map(
+            (s: { hotel_id: string; saved_at: string; hotel: { name?: string; location?: string; avg_rating?: number; review_count?: number } }) => ({
+              hotel_id: s.hotel_id,
+              hotel_name: s.hotel?.name ?? s.hotel_id,
+              destination: s.hotel?.location ?? "—",
+              avg_rating: s.hotel?.avg_rating ?? 0,
+              review_count: s.hotel?.review_count ?? 0,
+              saved_at: (s.saved_at ?? "").slice(0, 10),
+            })
+          )
+        )
+      )
+      .catch(() => setSaved([]))
+      .finally(() => setLoading(false));
+  }, [token]);
 
   const handleRemove = (hotelId: string) => {
     setRemoving(hotelId);
+    if (token) setHotelSaved(token, hotelId, false).catch(() => undefined);
     setTimeout(() => {
       setSaved((prev) => prev.filter((h) => h.hotel_id !== hotelId));
       setRemoving(null);
@@ -217,14 +207,17 @@ export default function ProfilePage() {
               <h2 className="text-sm font-bold text-white uppercase tracking-wider mb-5">
                 Recent AI Activity
               </h2>
+              {saved.length === 0 && (
+                <p className="text-xs text-slate-500">No activity yet. Save hotels from the Discover page.</p>
+              )}
               <div className="space-y-3">
-                {[
-                  { action: "Hybrid Ensemble run", detail: "Paris · 12 recommendations generated", time: "2h ago", icon: "🤖", color: "text-cyan-400" },
-                  { action: "Hotel viewed", detail: "Grand Palace Hotel Paris · Detail page", time: "2h ago", icon: "👁", color: "text-blue-400" },
-                  { action: "Hotel saved", detail: "The Landmark Suites New York", time: "Yesterday", icon: "♥", color: "text-rose-400" },
-                  { action: "Content-Based run", detail: "Tokyo · 8 recommendations generated", time: "2 days ago", icon: "📊", color: "text-indigo-400" },
-                  { action: "Account created", detail: "Joined TripSense AI Early Access", time: "Oct 14, 2026", icon: "✓", color: "text-emerald-400" },
-                ].map((activity, i) => (
+                {saved.slice(0, 5).map((h) => ({
+                  action: "Hotel saved",
+                  detail: `${h.hotel_name} · ${h.destination}`,
+                  time: h.saved_at,
+                  icon: "♥",
+                  color: "text-rose-400",
+                })).map((activity, i) => (
                   <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-slate-950/40 border border-slate-800/50 hover:border-slate-700/60 transition">
                     <div className={`w-8 h-8 rounded-lg bg-slate-800/80 flex items-center justify-center text-sm shrink-0 ${activity.color}`}>
                       {activity.icon}
@@ -290,7 +283,7 @@ export default function ProfilePage() {
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-3">
                       <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {hotel.match_percentage}% Match
+                        {hotel.destination}
                       </span>
                       <span className="text-xs text-slate-500">{hotel.saved_at}</span>
                     </div>

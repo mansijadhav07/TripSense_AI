@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, status
 from typing import Optional
 
 from schemas.analytics import DatasetStatsResponse, ModelPerformanceResponse
-from services.analytics_service import AnalyticsService
+from services.analytics_service import AnalyticsService, ResultsUnavailable
 
 router = APIRouter()
 
@@ -25,134 +25,53 @@ def get_analytics_service() -> AnalyticsService:
     return _analytics_service
 
 
-@router.get(
-    "/dataset-stats",
-    response_model=DatasetStatsResponse,
-    summary="Dataset Statistics",
-    description="Returns actual computed statistics about the TripAdvisor dataset."
-)
+def _call(fn):
+    """Run a service call, mapping missing pipeline results to 503 (never fabricated data)."""
+    try:
+        return fn()
+    except ResultsUnavailable as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+
+
+@router.get("/dataset-stats", response_model=DatasetStatsResponse, summary="Dataset Statistics")
 async def get_dataset_stats():
-    """
-    Return real dataset statistics computed during the data pipeline.
-    
-    Includes:
-    - Total reviews, hotels, users
-    - Rating distribution
-    - Interaction sparsity
-    - Train/test split sizes
-    """
-    try:
-        service = get_analytics_service()
-        stats = service.get_dataset_stats()
-        return DatasetStatsResponse(
-            success=True,
-            data=stats,
-            message="Dataset statistics retrieved"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve dataset stats: {str(e)}"
-        )
+    """Dataset statistics computed by the evaluation pipeline from the raw data."""
+    stats = _call(get_analytics_service().get_dataset_stats)
+    return DatasetStatsResponse(success=True, data=stats, message="Dataset statistics retrieved")
 
 
-@router.get(
-    "/model-performance",
-    response_model=ModelPerformanceResponse,
-    summary="Model Performance Metrics",
-    description="Returns evaluation metrics for all recommendation models."
-)
+@router.get("/model-performance", response_model=ModelPerformanceResponse, summary="Model Performance Metrics")
 async def get_model_performance():
-    """
-    Return recommendation model performance metrics.
-    
-    Metrics are computed on the held-out test set and include:
-    - Precision@10, Recall@10, NDCG@10
-    - MAP (Mean Average Precision)
-    - Coverage and Hit Rate
-    """
-    try:
-        service = get_analytics_service()
-        performance = service.get_model_performance()
-        return ModelPerformanceResponse(
-            success=True,
-            data=performance,
-            message="Model performance data retrieved"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve model performance: {str(e)}"
-        )
+    """Leakage-free evaluation results; metrics are null when a model is not evaluable."""
+    perf = _call(get_analytics_service().get_model_performance)
+    return ModelPerformanceResponse(success=True, data=perf, message="Model performance data retrieved")
 
 
-@router.get(
-    "/spark-benchmarks",
-    summary="Spark Performance Benchmarks",
-    description="Returns Spark vs Pandas benchmark results for the data pipeline."
-)
+@router.get("/spark-benchmarks", summary="Spark Performance Benchmarks")
 async def get_spark_benchmarks():
-    """
-    Return Apache Spark vs Pandas performance benchmark data.
-    
-    Shows how Spark scales compared to Pandas at different dataset sizes.
-    Benchmarks measure feature engineering and aggregation operations.
-    """
-    try:
-        service = get_analytics_service()
-        benchmarks = service.get_spark_benchmarks()
-        return {
-            "success": True,
-            "data": {
-                "benchmarks": benchmarks,
-                "environment": {
-                    "spark_version": "3.4+",
-                    "executor_memory": "4GB",
-                    "num_cores": 4,
-                    "operations_tested": ["Feature Engineering", "Aggregation"]
-                },
-                "insight": "Spark shows benefit at dataset sizes > 100K rows. For this dataset (201K), Spark provides ~1.2x speedup for feature engineering."
-            },
-            "message": "Spark benchmarks retrieved"
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    """Measured Spark vs Pandas timings (winner/speedup derived from the measurements)."""
+    benchmarks = _call(get_analytics_service().get_spark_benchmarks)
+    return {"success": True, "data": {"benchmarks": benchmarks}, "message": "Spark benchmarks retrieved"}
 
 
-@router.get(
-    "/overview",
-    summary="Analytics Overview",
-    description="Returns combined analytics snapshot for dashboard overview."
-)
+@router.get("/overview", summary="Analytics Overview")
 async def get_overview():
     """Combined endpoint returning all analytics data in one call."""
+    service = get_analytics_service()
+    stats = _call(service.get_dataset_stats)
+    performance = _call(service.get_model_performance)
     try:
-        service = get_analytics_service()
-        stats = service.get_dataset_stats()
-        performance = service.get_model_performance()
         benchmarks = service.get_spark_benchmarks()
-
-        return {
-            "success": True,
-            "data": {
-                "dataset": stats,
-                "dataset_summary": stats,
-                "model_performance": performance,
-                "top_models": performance.get("models", []),
-                "spark_benchmarks": benchmarks,
-                "system_info": {
-                    "api_version": "1.0.0",
-                    "models_implemented": 4,
-                    "pipeline_stages": ["Ingestion", "Cleaning", "Feature Engineering", "Training", "Evaluation"],
-                }
-            },
-            "message": "Analytics overview retrieved"
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+    except ResultsUnavailable:
+        benchmarks = []
+    return {
+        "success": True,
+        "data": {
+            "dataset_summary": stats,
+            "model_performance": performance,
+            "top_models": performance["models"],
+            "spark_benchmarks": benchmarks,
+            "system_info": {"api_version": "1.0.0"},
+        },
+        "message": "Analytics overview retrieved",
+    }

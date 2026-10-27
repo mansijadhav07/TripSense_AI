@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -31,37 +29,34 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql://${DB_USER:-tripsense_user}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-tripsense}
+      TRIPSENSE_EVALUATION_DIR: /app/results
     volumes:
-      - ./apps/api:/app
-      - ./data:/app/data
-      - ./artifacts:/app/artifacts
+      # data and pipeline results are mounted read-only; application code comes from the image
+      - ./data:/app/data:ro
+      - ./artifacts:/app/artifacts:ro
+      - ./ml/evaluation/results:/app/results:ro
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
     networks:
       - tripsense-network
 
-  # Next.js Frontend
+  # Next.js Frontend (production build, standalone server)
   web:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
-      target: base
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     container_name: tripsense-web
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    volumes:
-      - ./apps/web:/app
-      - /app/node_modules
-      - /app/.next
     ports:
       - "3000:3000"
     depends_on:
       - api
-    command: npm run dev
+    restart: unless-stopped
     networks:
       - tripsense-network
 

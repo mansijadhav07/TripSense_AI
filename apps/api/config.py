@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     
+    # Serve clearly-labelled synthetic hotels when no valid catalogue exists (demo only; never for production)
+    allow_synthetic_data: bool = False
+
     # Data Paths
     raw_data_path: str = "./data/raw/tripadvisor_reviews.csv"
     processed_data_path: str = "./data/processed"
@@ -106,6 +109,15 @@ class Settings(BaseSettings):
         if not 0.95 <= total <= 1.05:
             raise ValueError(f"Hybrid model weights must sum to ~1.0, got {total}")
     
+    def validate_production_security(self) -> None:
+        """Refuse to start in production with a placeholder/weak JWT secret or synthetic data."""
+        if not self.is_production:
+            return
+        if self.secret_key.upper().startswith("CHANGEME") or len(self.secret_key) < 32:
+            raise ValueError("SECRET_KEY must be a random value of at least 32 characters in production")
+        if self.allow_synthetic_data:
+            raise ValueError("ALLOW_SYNTHETIC_DATA must be false in production")
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
@@ -126,6 +138,7 @@ def get_settings() -> Settings:
     """
     settings = Settings()
     settings.validate_weights()
+    settings.validate_production_security()
     return settings
 
 

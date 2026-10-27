@@ -1,0 +1,49 @@
+{
+  "total_reviews": 60181,
+  "total_users": 3000,
+  "total_hotels": 500,
+  "train_reviews": 49293,
+  "test_reviews": 10888,
+  "avg_rating": 3.385,
+  "rating_std": 0.972,
+  "rating_distribution": [
+    {
+      "rating": "1",
+      "percentage": 2.4
+    },
+    {
+      "rating": "2",
+      "percentage": 15.4
+    },
+    {
+      "rating": "3",
+      "percentage": 36.6
+    },
+    {
+      "rating": "4",
+      "percentage": 32.8
+    },
+    {
+      "rating": "5",
+      "percentage": 12.9
+    }
+  ],
+  "reviews_per_hotel": {
+    "mean": 120.4,
+    "min": 52,
+    "max": 250
+  },
+  "reviews_per_user": {
+    "mean": 20.1,
+    "min": 10,
+    "max": 30
+  },
+  "sparsity_percent": 95.99,
+  "date_range": {
+    "start": "2022-01-01",
+    "end": "2024-06-18"
+  },
+  "split": "per-user chronological: each user's latest 20% of reviews held out",
+  "seed": 42,
+  "is_synthetic": true
+}

@@ -1,310 +1,130 @@
 """
 TripSense AI - Analytics Service
-
-Loads real dataset statistics, model evaluation results, and
-Spark benchmark data for the analytics dashboard.
+================================
+Serves dataset statistics and held-out model metrics. Nothing is hardcoded:
+  * ml/evaluation/results/synthetic_evaluation.json  <- ml/scripts/train_and_evaluate.py
+  * data/processed/dataset_stats.json                <- ml/scripts/generate_synthetic_dataset.py
+  * ml/evaluation/results/spark_benchmark.json       <- ml/evaluation/benchmark_spark.py
+If a file is missing the endpoint answers 503 telling the operator which script to run.
 """
 
-import logging
 import json
-import numpy as np
-import pandas as pd
+import logging
+import os
 from pathlib import Path
-from typing import Optional, Dict, List, Any
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
+MODEL_DISPLAY = [
+    ("popularity", "Popularity Baseline", "non_personalized",
+     "Non-personalised baseline: Bayesian-average rating."),
+    ("collaborative_filtering_svd", "Collaborative Filtering (SVD)", "personalized",
+     "Matrix factorisation: scikit-surprise SVD for rating prediction + truncated SVD of the interaction matrix for ranking."),
+    ("content_based", "Content-Based", "personalized",
+     "Cosine similarity between a user profile and hotel vectors (review-text TF-IDF, destination, style, amenities, aspect quality)."),
+    ("sentiment_analysis", "Sentiment Analysis", "text",
+     "TF-IDF + logistic regression classifying review text as negative / neutral / positive; for ranking, hotels are ordered by mean (shrunk, out-of-fold) review sentiment."),
+    ("hybrid_ensemble", "Hybrid Ensemble", "ensemble",
+     "Validation-tuned blend of CF, content and sentiment scores."),
+    ("random_baseline", "Random Baseline", "non_personalized",
+     "Seeded random ranking, the floor every model must beat."),
+]
+
+
+class ResultsUnavailable(RuntimeError):
+    """Raised when the pipeline has not produced the requested results file."""
+
 
 class AnalyticsService:
-    """Serves real analytics data computed during ML pipeline."""
+    """Serves analytics data from ML evaluation results."""
 
-    def __init__(self):
+    def __init__(self, evaluation_dir: Optional[Path] = None):
         self.project_root = self._find_project_root()
-        self.data_dir = self.project_root / "data"
-        self.evaluation_dir = self.project_root / "ml" / "evaluation" / "results"
-        self._cache: Dict[str, Any] = {}
+        env_dir = os.environ.get("TRIPSENSE_EVALUATION_DIR")
+        self.evaluation_dir = Path(
+            evaluation_dir or env_dir or (self.project_root / "ml" / "evaluation" / "results")
+        )
 
-    def _find_project_root(self) -> Path:
-        candidates = [
-            Path(__file__).resolve().parent.parent.parent.parent,
-            Path("../../../.."),
-            Path("../../.."),
-        ]
-        for p in candidates:
-            if (p / "data").exists() or (p / "ml").exists():
-                return p.resolve()
+    @staticmethod
+    def _find_project_root() -> Path:
+        here = Path(__file__).resolve()
+        for p in here.parents:
+            if (p / "ml").exists() and (p / "apps").exists():
+                return p
         return Path.cwd()
 
-    def get_dataset_stats(self) -> Dict[str, Any]:
-        """Load and return real dataset statistics."""
-        if "dataset_stats" in self._cache:
-            return self._cache["dataset_stats"]
+    def _load(self, name: str) -> Dict[str, Any]:
+        path = self.evaluation_dir / name
+        if not path.exists():
+            raise ResultsUnavailable(
+                f"{name} not found at {path}. "
+                "Run `python ml/scripts/train_and_evaluate.py` first."
+            )
+        with open(path) as f:
+            return json.load(f)
 
-        stats = self._compute_dataset_stats()
-        self._cache["dataset_stats"] = stats
+    def get_dataset_stats(self) -> Dict[str, Any]:
+        stats_path = self.project_root / "data" / "processed" / "dataset_stats.json"
+        if not stats_path.exists():
+            raise ResultsUnavailable(f"{stats_path} not found. Run `python ml/scripts/generate_synthetic_dataset.py`.")
+        stats = json.loads(stats_path.read_text())
+        stats.update({
+            "data_source": "Synthetic (reproducible, seed=%s)" % stats.get("seed", 42),
+            "hotel_id_is_unique_per_row": False,
+            "dataset_note": "Synthetic dataset with learnable user/hotel structure; see ml/scripts/generate_synthetic_dataset.py.",
+        })
         return stats
 
-    def _compute_dataset_stats(self) -> Dict[str, Any]:
-        """Compute statistics from actual data files."""
-        try:
-            # Try loading cleaned/processed data
-            candidates = [
-                self.data_dir / "processed" / "tripadvisor_cleaned.parquet",
-                self.data_dir / "processed" / "features" / "hotel_features_complete.parquet",
-                self.data_dir / "processed" / "test.parquet",
-            ]
-
-            df = None
-            for path in candidates:
-                if path.exists():
-                    df = pd.read_parquet(path)
-                    logger.info(f"Loaded stats data from {path}")
-                    break
-
-            # Load split info
-            split_info_path = self.data_dir / "processed" / "splits" / "split_info.json"
-            split_info = {}
-            if split_info_path.exists():
-                with open(split_info_path) as f:
-                    split_info = json.load(f)
-
-            # Load hotel features for hotel count
-            hotel_path = self.data_dir / "processed" / "features" / "hotel_features_complete.parquet"
-            hotel_df = None
-            if hotel_path.exists():
-                hotel_df = pd.read_parquet(hotel_path)
-
-            # Compute stats
-            total_reviews = split_info.get("total_interactions", 0)
-            if df is not None and total_reviews == 0:
-                total_reviews = len(df)
-
-            total_hotels = len(hotel_df) if hotel_df is not None else (
-                df[next((c for c in ["hotel_id", "offering_id"] if c in df.columns), "hotel_id")].nunique()
-                if df is not None else 0
-            )
-
-            total_users = split_info.get("total_users", 0)
-            if df is not None and total_users == 0:
-                user_col = next((c for c in ["user_id", "reviewer_id"] if c in df.columns), None)
-                if user_col:
-                    total_users = df[user_col].nunique()
-
-            # Rating stats
-            avg_rating = 4.14
-            rating_std = 1.05
-            rating_distribution = []
-
-            if df is not None:
-                rating_col = next((c for c in ["overall", "rating", "Rating", "avg_rating"] if c in df.columns), None)
-                if rating_col:
-                    ratings = pd.to_numeric(df[rating_col], errors="coerce").dropna()
-                    avg_rating = round(float(ratings.mean()), 2)
-                    rating_std = round(float(ratings.std()), 2)
-
-                    for r in [1, 2, 3, 4, 5]:
-                        count = int((ratings.round() == r).sum())
-                        pct = round(count / len(ratings) * 100, 1) if len(ratings) > 0 else 0
-                        rating_distribution.append({
-                            "rating": str(r),
-                            "label": f"{r} Star{'s' if r > 1 else ''}",
-                            "count": count,
-                            "percentage": pct
-                        })
-
-            # Sparsity
-            sparsity = 0.0
-            if total_users > 0 and total_hotels > 0:
-                possible_interactions = total_users * total_hotels
-                sparsity = round((1 - total_reviews / possible_interactions) * 100, 2) if possible_interactions > 0 else 99.9
-
-            return {
-                "total_reviews": total_reviews,
-                "total_hotels": total_hotels,
-                "total_users": total_users,
-                "avg_rating": avg_rating,
-                "rating_std": rating_std,
-                "sparsity_percent": sparsity,
-                "train_reviews": split_info.get("train_interactions", int(total_reviews * 0.8)),
-                "test_reviews": split_info.get("test_interactions", int(total_reviews * 0.2)),
-                "rating_distribution": rating_distribution,
-                "data_source": "TripAdvisor Hotel Reviews (Kaggle)",
-                "collection_notes": "Real hotel reviews dataset with aspect-level ratings"
-            }
-
-        except Exception as e:
-            logger.error(f"Error computing dataset stats: {e}")
-            # Return known real values from actual processed dataset
-            return {
-                "total_reviews": 54_764,
-                "total_hotels": 50_780,
-                "total_users": 19_531,
-                "avg_rating": 4.14,
-                "rating_std": 1.05,
-                "sparsity_percent": 99.99,
-                "train_reviews": 43_812,
-                "test_reviews": 10_952,
-                "rating_distribution": [
-                    {"rating": "1", "label": "1 Star", "count": 1_955, "percentage": 3.6},
-                    {"rating": "2", "label": "2 Stars", "count": 2_683, "percentage": 4.9},
-                    {"rating": "3", "label": "3 Stars", "count": 7_398, "percentage": 13.5},
-                    {"rating": "4", "label": "4 Stars", "count": 16_695, "percentage": 30.5},
-                    {"rating": "5", "label": "5 Stars", "count": 26_033, "percentage": 47.5},
-                ],
-                "data_source": "TripAdvisor Hotel Reviews (Kaggle)",
-                "collection_notes": "Real hotel reviews dataset with aspect-level ratings"
-            }
-
     def get_model_performance(self) -> Dict[str, Any]:
-        """Load model evaluation results from Phase 4 output."""
-        if "model_performance" in self._cache:
-            return self._cache["model_performance"]
-
-        results = self._load_evaluation_results()
-        self._cache["model_performance"] = results
-        return results
-
-    def _load_evaluation_results(self) -> Dict[str, Any]:
-        """Load from evaluation JSON or return documented results."""
-        try:
-            # Try loading updated results first (Phase 3-4 complete)
-            json_path = self.evaluation_dir / "model_comparison_updated.json"
-            if json_path.exists():
-                with open(json_path) as f:
-                    data = json.load(f)
-
-                models = []
-                for r in data.get("results", []):
-                    k = data.get("dataset", {}).get("k", 10)
-                    models.append({
-                        "model_name": r.get("model", "Unknown"),
-                        "model_type": r.get("type", "unknown"),
-                        "precision_at_10": round(r.get(f"precision_at_{k}", 0), 4),
-                        "recall_at_10": round(r.get(f"recall_at_{k}", 0), 4),
-                        "ndcg_at_10": round(r.get(f"ndcg_at_{k}", 0), 4),
-                        "map_score": round(r.get("map", 0), 4),
-                        "coverage": round(r.get("coverage", 0), 4),
-                        "hit_rate": round(r.get("hit_rate", 0), 4),
-                        "description": r.get("description", ""),
-                    })
-
-                return {
-                    "models": models,
-                    "evaluation_timestamp": data.get("evaluation_timestamp"),
-                    "dataset": data.get("dataset", {}),
-                    "note": data.get("note", "Metrics reflect comprehensive evaluation with data fixes, baseline reproduction, debugging, and ablations")
-                }
-            
-            # Fall back to original model_comparison.json
-            json_path = self.evaluation_dir / "model_comparison.json"
-            if json_path.exists():
-                with open(json_path) as f:
-                    data = json.load(f)
-
-                models = []
-                for r in data.get("results", []):
-                    k = data.get("dataset", {}).get("k", 10)
-                    models.append({
-                        "model_name": r.get("model", "Unknown"),
-                        "model_type": r.get("type", "unknown"),
-                        "precision_at_10": round(r.get(f"precision_at_{k}", 0), 4),
-                        "recall_at_10": round(r.get(f"recall_at_{k}", 0), 4),
-                        "ndcg_at_10": round(r.get(f"ndcg_at_{k}", 0), 4),
-                        "map_score": round(r.get("map", 0), 4),
-                        "coverage": round(r.get("coverage", 0), 4),
-                        "hit_rate": round(r.get("hit_rate", 0), 4),
-                        "description": r.get("description", ""),
-                    })
-
-                return {
-                    "models": models,
-                    "evaluation_timestamp": data.get("evaluation_timestamp"),
-                    "dataset": data.get("dataset", {}),
-                    "note": "Metrics reflect cold-start evaluation on held-out test users"
-                }
-
-        except Exception as e:
-            logger.error(f"Error loading evaluation results: {e}")
-
-        # Documented results from Phase 3 training
+        data = self._load("synthetic_evaluation.json")
+        raw = data["models"]
+        info = data["dataset_info"]
+        k = info["k"]
+        models: List[Dict[str, Any]] = []
+        for key, name, mtype, desc in MODEL_DISPLAY:
+            m = raw.get(key)
+            if m is None:
+                continue
+            e: Dict[str, Any] = {"model_name": name, "model_type": mtype, "description": desc,
+                                 "status": "evaluated", "reason": None, "k": k}
+            if mtype == "text":
+                # Ranking metrics come from ranking hotels by their mean review sentiment
+                # (same protocol as every other model); classification metrics are kept alongside.
+                r = m.get("ranking_by_hotel_sentiment") or {}
+                e.update(precision_at_10=r.get("precision_at_k"), recall_at_10=r.get("recall_at_k"),
+                         ndcg_at_10=r.get("ndcg_at_k"), hit_rate=r.get("hit_rate_at_k"),
+                         coverage=r.get("catalog_coverage"), evaluated_users=r.get("evaluated_users"),
+                         text_metrics={f: m.get(f) for f in (
+                             "accuracy", "macro_f1", "majority_class_accuracy", "majority_class_macro_f1",
+                             "auc_positive_vs_rest", "n_test_reviews")})
+            else:
+                e.update(precision_at_10=m["precision_at_k"], recall_at_10=m["recall_at_k"], ndcg_at_10=m["ndcg_at_k"],
+                         hit_rate=m["hit_rate_at_k"], coverage=m.get("catalog_coverage"),
+                         evaluated_users=m.get("evaluated_users"))
+                if "rmse" in m:
+                    e["rating_metrics"] = {f: m.get(f) for f in ("rmse", "mae", "baseline_global_mean_rmse",
+                                                                   "baseline_global_mean_mae")}
+                if m.get("weights"):
+                    e["weights"] = m["weights"]
+            models.append(e)
         return {
-            "models": [
-                {
-                    "model_name": "Popularity",
-                    "model_type": "non_personalized",
-                    "precision_at_10": 0.023,
-                    "recall_at_10": 0.018,
-                    "ndcg_at_10": 0.031,
-                    "map_score": 0.019,
-                    "coverage": 0.12,
-                    "hit_rate": 0.18,
-                    "description": "Global popularity baseline - review count + rating"
-                },
-                {
-                    "model_name": "Content-Based",
-                    "model_type": "personalized",
-                    "precision_at_10": 0.041,
-                    "recall_at_10": 0.033,
-                    "ndcg_at_10": 0.058,
-                    "map_score": 0.038,
-                    "coverage": 0.35,
-                    "hit_rate": 0.29,
-                    "description": "Feature cosine similarity with aspect weights"
-                },
-                {
-                    "model_name": "Collaborative Filtering (ALS)",
-                    "model_type": "personalized",
-                    "precision_at_10": 0.052,
-                    "recall_at_10": 0.044,
-                    "ndcg_at_10": 0.071,
-                    "map_score": 0.047,
-                    "coverage": 0.28,
-                    "hit_rate": 0.36,
-                    "description": "Matrix factorization - 50 latent factors"
-                },
-                {
-                    "model_name": "Hybrid Ensemble",
-                    "model_type": "personalized",
-                    "precision_at_10": 0.063,
-                    "recall_at_10": 0.055,
-                    "ndcg_at_10": 0.089,
-                    "map_score": 0.061,
-                    "coverage": 0.41,
-                    "hit_rate": 0.44,
-                    "description": "CF(35%) + Content(30%) + Sentiment(20%) + Pop(15%)"
-                },
-            ],
-            "note": "Metrics from Phase 3 training evaluation on internal validation set",
-            "evaluation_timestamp": None
+            "models": models,
+            "evaluation_timestamp": data.get("evaluated_at"),
+            "dataset_info": info,
+            "leakage_checks": data.get("leakage_checks"),
+            "tuning": data.get("tuning"),
+            "note": (f"All metrics are computed on held-out test reviews ({info['split']}). {info['evaluation_protocol']}"),
         }
 
     def get_spark_benchmarks(self) -> List[Dict[str, Any]]:
-        """Return Spark vs Pandas benchmark data."""
-        # Try loading from file first
-        benchmark_path = self.evaluation_dir / "spark_benchmark.json"
-        if benchmark_path.exists():
-            try:
-                with open(benchmark_path) as f:
-                    data = json.load(f)
-                    # Extract the benchmarks array from the nested structure
-                    if isinstance(data, dict) and "benchmarks" in data:
-                        return data["benchmarks"]
-                    elif isinstance(data, list):
-                        return data
-                    else:
-                        logger.warning(f"Unexpected benchmark data structure: {type(data)}")
-            except Exception as e:
-                logger.error(f"Error loading spark benchmarks: {e}")
-
-        # Return documented benchmark results
-        return [
-            {"dataset_size": 1_000, "operation": "Feature Engineering", "spark_seconds": 8.2, "pandas_seconds": 0.3, "speedup": 0.04},
-            {"dataset_size": 10_000, "operation": "Feature Engineering", "spark_seconds": 9.1, "pandas_seconds": 1.1, "speedup": 0.12},
-            {"dataset_size": 50_000, "operation": "Feature Engineering", "spark_seconds": 10.4, "pandas_seconds": 4.8, "speedup": 0.46},
-            {"dataset_size": 100_000, "operation": "Feature Engineering", "spark_seconds": 12.8, "pandas_seconds": 9.6, "speedup": 0.75},
-            {"dataset_size": 201_853, "operation": "Feature Engineering", "spark_seconds": 18.3, "pandas_seconds": 22.1, "speedup": 1.21},
-            {"dataset_size": 1_000, "operation": "Aggregation", "spark_seconds": 7.9, "pandas_seconds": 0.1, "speedup": 0.01},
-            {"dataset_size": 10_000, "operation": "Aggregation", "spark_seconds": 8.3, "pandas_seconds": 0.4, "speedup": 0.05},
-            {"dataset_size": 100_000, "operation": "Aggregation", "spark_seconds": 11.1, "pandas_seconds": 3.8, "speedup": 0.34},
-            {"dataset_size": 201_853, "operation": "Aggregation", "spark_seconds": 15.7, "pandas_seconds": 8.1, "speedup": 0.52},
-        ]
+        """Return Spark vs Pandas performance benchmarks."""
+        data = self._load("spark_benchmark.json")
+        benchmarks = data["benchmarks"] if isinstance(data, dict) else data
+        out = []
+        for b in benchmarks:
+            b = dict(b)
+            b["speedup"] = round(b["pandas_seconds"] / b["spark_seconds"], 3) if b.get("spark_seconds") else None
+            b["winner"] = "Spark" if (b.get("spark_seconds") or 999) < (b.get("pandas_seconds") or 0) else "Pandas"
+            out.append(b)
+        return out

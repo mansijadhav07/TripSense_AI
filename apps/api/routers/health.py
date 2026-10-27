@@ -5,6 +5,7 @@ Health and readiness endpoints for monitoring and load balancing.
 """
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime
@@ -57,11 +58,10 @@ async def readiness_check(db: Session = Depends(get_db)):
         checks["database"] = "connected"
     except Exception as e:
         checks["database"] = f"error: {str(e)}"
-        return {
-            "ready": False,
-            "checks": checks,
-            "timestamp": datetime.utcnow().isoformat()
-        }, status.HTTP_503_SERVICE_UNAVAILABLE
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"ready": False, "checks": checks, "timestamp": datetime.utcnow().isoformat()},
+        )
     
     # Check disk space
     try:
@@ -83,8 +83,12 @@ async def readiness_check(db: Session = Depends(get_db)):
     except Exception as e:
         checks["memory"] = f"error: {str(e)}"
     
-    # TODO Phase 5: Check if ML models are loaded
-    # checks["models"] = "loaded" if model_service.is_loaded() else "not_loaded"
+    from services.hotel_service import get_hotel_store
+    store = get_hotel_store()
+    checks["hotel_catalog"] = f"{store.data_source} ({store.total_hotels} hotels)"
+    from services.ml_model_loader import get_model_store
+    ms = get_model_store()
+    checks["ml_models"] = "loaded (CF-SVD, content, sentiment, hybrid)" if ms.available else f"unavailable: {ms.error}"
     
     return {
         "status": "ready",
@@ -121,7 +125,7 @@ async def info():
             "cors_origins": settings.cors_origins
         },
         "features": {
-            "ml_models": "Phase 5",
+            "ml_models": "CF-SVD, content-based, sentiment, hybrid",
             "recommendations": "Phase 5",
             "analytics": "Phase 4"
         },

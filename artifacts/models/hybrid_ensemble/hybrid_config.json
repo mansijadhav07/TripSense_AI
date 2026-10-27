@@ -1,0 +1,13 @@
+{
+  "weights": {
+    "cf": 0.6,
+    "content": 0.3,
+    "sentiment": 0.1
+  },
+  "cold_start_weights": {
+    "cf": 0.2,
+    "content": 0.5,
+    "sentiment": 0.3
+  },
+  "tuned_on": "validation split of train"
+}

@@ -1,3 +1,5 @@
+> **RETRACTED METRICS:** figures in this card came from a leaky/corrupted evaluation and are not valid. See README → *Verified status* and `ml/evaluation/results/verified_evaluation.json`.
+
 # Model Card: Popularity-Based Recommender
 
 ## Model Details

@@ -36,6 +36,14 @@ class RecommendationRequest(BaseModel):
         default="hybrid",
         description="Model to use: hybrid, popularity, content, collaborative"
     )
+    travel_styles: Optional[List[str]] = Field(
+        default=None,
+        description="Preferred travel styles: family, business, romantic, budget, luxury, adventure"
+    )
+    dataset_user_id: Optional[str] = Field(
+        default=None,
+        description="Demo persona: score as an existing dataset user (e.g. user_00012) using their trained factors and history"
+    )
     user_context: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Additional context (e.g., travel dates, group size)"

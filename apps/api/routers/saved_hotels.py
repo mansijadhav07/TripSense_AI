@@ -29,7 +29,7 @@ async def list_saved_hotels(
     
     items = []
     for s in saved:
-        hotel_data = hotel_store.get_hotel_by_id(s.hotel_id)
+        hotel_data = hotel_store.get_by_id(s.hotel_id)
         items.append({
             "id": str(s.id),
             "hotel_id": s.hotel_id,
@@ -37,9 +37,10 @@ async def list_saved_hotels(
             "hotel": hotel_data or {
                 "hotel_id": s.hotel_id,
                 "name": f"Hotel {s.hotel_id}",
-                "avg_rating": 4.0,
-                "review_count": 50,
-                "location": "Saved"
+                "avg_rating": None,
+                "review_count": None,
+                "location": None,
+                "details_available": False,
             }
         })
     

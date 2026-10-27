@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth";
+import { submitReview, analyzeSentiment, setHotelSaved, fetchSavedHotelIds, SentimentResult } from "@/lib/api";
 
 interface HotelDetail {
   hotel_id: string;
@@ -92,50 +94,6 @@ function ModelDonut({ contribution }: { contribution: Record<string, number> }) 
   );
 }
 
-function generateFallbackHotel(id: string): HotelDetail {
-  const names = [
-    "Grand Palace Hotel", "Royal Harbor Resort", "The Landmark Suites",
-    "Boutique Heritage Inn", "Metropolis Executive Tower", "Oceanfront Horizon Lodge",
-    "Alpine Luxe Retreat", "Starlight Courtyard Hotel",
-  ];
-  const cities = ["Paris", "Tokyo", "New York", "London", "Rome", "Barcelona", "Sydney", "Dubai"];
-  const idx = parseInt(id.replace(/\D/g, "")) || 0;
-  return {
-    hotel_id: id,
-    hotel_name: names[idx % names.length],
-    destination: cities[idx % cities.length],
-    avg_rating: +(4.2 + (idx % 8) * 0.1).toFixed(1),
-    review_count: 240 + idx * 180,
-    score: 0.92,
-    match_percentage: 94,
-    sentiment_score: 0.87,
-    aspect_scores: {
-      cleanliness: 4.8,
-      service: 4.6,
-      location: 4.9,
-      rooms: 4.5,
-      value: 4.3,
-      sleep_quality: 4.7,
-    },
-    explanation: {
-      primary_reason: "Exceptional match based on your aspect preferences and historical interaction patterns.",
-      contributing_factors: [
-        "Highest cleanliness score in destination category",
-        "Overwhelmingly positive guest sentiment (89% positive reviews)",
-        "Consistent service ratings across all traveler segments",
-        "Premium location with excellent transport connectivity",
-        "Exceptional value-for-money ratio relative to peer hotels",
-      ],
-      model_contribution: {
-        collaborative: 0.35,
-        content: 0.3,
-        sentiment: 0.2,
-        popularity: 0.15,
-      },
-    },
-  };
-}
-
 function HotelDetailContent() {
   const params = useParams();
   const router = useRouter();
@@ -144,6 +102,40 @@ function HotelDetailContent() {
   const [hotel, setHotel] = useState<HotelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const { token } = useAuth();
+  const [reviewText, setReviewText] = useState("");
+  const [reviewRating, setReviewRating] = useState<number | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewResult, setReviewResult] = useState<{ sentiment: SentimentResult; stored: boolean } | null>(null);
+
+  useEffect(() => {
+    if (token && hotelId) fetchSavedHotelIds(token).then((ids) => setSaved(ids.includes(hotelId)));
+  }, [token, hotelId]);
+
+  const toggleSaved = () => {
+    const next = !saved;
+    setSaved(next);
+    if (token) setHotelSaved(token, hotelId, next).catch(() => setSaved(!next));
+  };
+
+  const handleReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setReviewBusy(true);
+    setReviewError(null);
+    try {
+      if (token) {
+        const r = await submitReview(token, { hotel_id: hotelId, text: reviewText, rating: reviewRating });
+        setReviewResult({ sentiment: r.sentiment, stored: true });
+      } else {
+        setReviewResult({ sentiment: await analyzeSentiment(reviewText), stored: false });
+      }
+    } catch (err) {
+      setReviewError(err instanceof Error ? err.message : "Could not analyse the review.");
+    } finally {
+      setReviewBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!hotelId) return;
@@ -156,7 +148,7 @@ function HotelDetailContent() {
         return json.data as HotelDetail;
       })
       .then((data) => setHotel(data))
-      .catch(() => setHotel(generateFallbackHotel(hotelId)))
+      .catch(() => setHotel(null))
       .finally(() => setLoading(false));
   }, [hotelId]);
 
@@ -259,7 +251,7 @@ function HotelDetailContent() {
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setSaved((s) => !s)}
+                  onClick={toggleSaved}
                   className={`px-4 py-2 rounded-xl text-xs font-semibold border transition ${
                     saved
                       ? "bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25"
@@ -398,26 +390,87 @@ function HotelDetailContent() {
               </div>
             )}
 
-            {/* Traveler Experience Overview */}
+            {/* Review + sentiment analysis */}
             <div className="bg-slate-900/60 rounded-2xl border border-slate-800 p-8">
-              <h2 className="text-base font-bold text-white mb-6">Traveler Experience Overview</h2>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {[
-                  { label: "Excellent Reviews", value: "87%", icon: "⭐", color: "text-amber-400" },
-                  { label: "Would Recommend", value: "91%", icon: "👍", color: "text-emerald-400" },
-                  { label: "Business Travelers", value: "34%", icon: "💼", color: "text-blue-400" },
-                  { label: "Couples", value: "38%", icon: "💑", color: "text-rose-400" },
-                  { label: "Families", value: "19%", icon: "👨‍👩‍👧", color: "text-purple-400" },
-                  { label: "Solo Travelers", value: "9%", icon: "🧳", color: "text-cyan-400" },
-                ].map((item) => (
-                  <div key={item.label} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-                    <span className="text-2xl block mb-1">{item.icon}</span>
-                    <span className={`text-xl font-black ${item.color}`}>{item.value}</span>
-                    <span className="text-[11px] text-slate-400 block mt-1 leading-tight">{item.label}</span>
+              <h2 className="text-base font-bold text-white mb-1">Write a Review</h2>
+              <p className="text-xs text-slate-400 mb-5">
+                Your text is scored by the trained sentiment model (TF-IDF + logistic regression).
+                {token
+                  ? " Rated reviews also personalise your future recommendations."
+                  : " Log in to save the review and use it for personalisation."}
+              </p>
+              <form onSubmit={handleReview} className="space-y-4">
+                <textarea
+                  value={reviewText}
+                  onChange={(e) => setReviewText(e.target.value)}
+                  required
+                  minLength={3}
+                  maxLength={5000}
+                  rows={4}
+                  placeholder="Describe your stay: the room, the staff, the location…"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+                />
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-1" aria-label="Star rating (optional)">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button
+                        type="button"
+                        key={n}
+                        onClick={() => setReviewRating(reviewRating === n ? null : n)}
+                        className={`text-2xl leading-none ${reviewRating !== null && n <= reviewRating ? "text-amber-400" : "text-slate-600"}`}
+                        aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                    <span className="text-xs text-slate-500 ml-2">optional</span>
                   </div>
-                ))}
-              </div>
+                  <button
+                    type="submit"
+                    disabled={reviewBusy || reviewText.trim().length < 3}
+                    className="ml-auto px-5 py-2 rounded-xl text-sm font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition disabled:opacity-50"
+                  >
+                    {reviewBusy ? "Analysing…" : token ? "Submit & Analyse" : "Analyse Sentiment"}
+                  </button>
+                </div>
+              </form>
+              {reviewError && (
+                <p role="alert" className="mt-4 text-sm text-rose-300">{reviewError}</p>
+              )}
+              {reviewResult && (
+                <div role="status" className="mt-5 p-4 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`text-lg font-black capitalize ${
+                        reviewResult.sentiment.label === "positive"
+                          ? "text-emerald-400"
+                          : reviewResult.sentiment.label === "negative"
+                          ? "text-rose-400"
+                          : "text-amber-400"
+                      }`}
+                    >
+                      {reviewResult.sentiment.label}
+                    </span>
+                    <span className="text-xs font-mono text-slate-400">
+                      score {reviewResult.sentiment.score.toFixed(2)} · confidence {(reviewResult.sentiment.confidence * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="mt-3 space-y-1.5">
+                    {Object.entries(reviewResult.sentiment.probabilities).map(([label, p]) => (
+                      <div key={label} className="flex items-center gap-2 text-[11px] text-slate-400">
+                        <span className="w-14 capitalize">{label}</span>
+                        <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                          <div className="h-full bg-cyan-500" style={{ width: `${(p * 100).toFixed(0)}%` }} />
+                        </div>
+                        <span className="w-10 text-right font-mono">{(p * 100).toFixed(0)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[11px] text-slate-500">
+                    {reviewResult.stored ? "Review saved to your account." : "Not stored (not logged in)."}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* CTA Section */}
@@ -437,7 +490,7 @@ function HotelDetailContent() {
                     ← Find More Hotels
                   </Link>
                   <button
-                    onClick={() => setSaved((s) => !s)}
+                    onClick={toggleSaved}
                     className="px-5 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 transition hover:shadow-cyan-500/40 active:scale-[0.98] whitespace-nowrap"
                   >
                     {saved ? "♥ Saved to Profile" : "♡ Save to Profile"}
