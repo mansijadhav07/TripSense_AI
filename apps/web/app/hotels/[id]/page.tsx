@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { submitReview, analyzeSentiment, setHotelSaved, fetchSavedHotelIds, SentimentResult } from "@/lib/api";
+import HotelReviews from "@/components/HotelReviews";
 
 interface HotelDetail {
   hotel_id: string;
@@ -110,6 +111,7 @@ function HotelDetailContent() {
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewResult, setReviewResult] = useState<{ sentiment: SentimentResult; stored: boolean } | null>(null);
+  const [reviewRefreshKey, setReviewRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!token || !hotelId) return;
@@ -149,6 +151,9 @@ function HotelDetailContent() {
       if (token) {
         const r = await submitReview(token, { hotel_id: hotelId, text: reviewText, rating: reviewRating });
         setReviewResult({ sentiment: r.sentiment, stored: true });
+        setReviewText("");
+        setReviewRating(null);
+        setReviewRefreshKey((key) => key + 1);
       } else {
         setReviewResult({ sentiment: await analyzeSentiment(reviewText), stored: false });
       }
@@ -253,7 +258,7 @@ function HotelDetailContent() {
                   <span className="text-slate-400">/ 5.0</span>
                 </div>
                 <span className="text-slate-600">•</span>
-                <span className="text-slate-400">{hotel.review_count.toLocaleString()} verified reviews</span>
+                <span className="text-slate-400">{hotel.review_count.toLocaleString()} catalog reviews</span>
                 {hotel.sentiment_score && (
                   <>
                     <span className="text-slate-600">•</span>
@@ -498,6 +503,8 @@ function HotelDetailContent() {
                 </div>
               )}
             </div>
+
+            <HotelReviews hotelId={hotelId} refreshKey={reviewRefreshKey} />
 
             {/* CTA Section */}
             <div className="bg-gradient-to-r from-cyan-500/10 via-blue-600/10 to-indigo-600/10 rounded-2xl border border-cyan-500/20 p-8">

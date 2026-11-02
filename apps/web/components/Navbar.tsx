@@ -38,10 +38,6 @@ export default function Navbar() {
               </span>
             </Link>
 
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              Spark ML Live
-            </span>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-3">

@@ -94,7 +94,7 @@ export default function Home() {
               <div className="text-xs text-slate-400">Indexed Properties</div>
             </div>
             <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
-              <div className="text-2xl font-bold text-cyan-400">201,382</div>
+              <div className="text-2xl font-bold text-cyan-400">201,295</div>
               <div className="text-xs text-slate-400">Verified Reviews</div>
             </div>
             <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800">

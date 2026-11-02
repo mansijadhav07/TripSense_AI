@@ -8,6 +8,7 @@ import {
 import {
   fetchRecommendations,
   fetchAnalyticsOverview,
+  fetchHotelReviews,
   fetchUserPreferences,
   setHotelSaved,
   submitReview,
@@ -40,6 +41,26 @@ describe("api client never fabricates data", () => {
     const r = await fetchRecommendations();
     expect(r.recommendations).toHaveLength(1);
     expect(r.data_source).toBe("synthetic-demo");
+  });
+
+  it("loads submitted reviews for a hotel without fabricating data", async () => {
+    const reviews = [{
+      id: "review-1",
+      rating: 5,
+      text: "Wonderful stay",
+      sentiment_label: "positive",
+      sentiment_score: 0.9,
+      created_at: "2025-01-02T12:00:00",
+    }];
+    const fetchMock = vi.fn();
+    fetchMock.mockResolvedValue(json({ data: reviews }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchHotelReviews("hotel/with spaces")).resolves.toEqual(reviews);
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/reviews/hotel/hotel%2Fwith%20spaces");
+
+    vi.stubGlobal("fetch", vi.fn(() => json({ detail: "Review service unavailable" }, 503)));
+    await expect(fetchHotelReviews("hotel-1")).rejects.toThrow("Review service unavailable");
   });
 
   it("returns null for analytics when the API is down (no hardcoded metrics)", async () => {

@@ -65,16 +65,42 @@ class AnalyticsService:
             return json.load(f)
 
     def get_dataset_stats(self) -> Dict[str, Any]:
-        stats_path = self.project_root / "data" / "processed" / "dataset_stats.json"
-        if not stats_path.exists():
-            raise ResultsUnavailable(f"{stats_path} not found. Run `python ml/scripts/generate_synthetic_dataset.py`.")
-        stats = json.loads(stats_path.read_text())
-        stats.update({
-            "data_source": "Synthetic (reproducible, seed=%s)" % stats.get("seed", 42),
-            "hotel_id_is_unique_per_row": False,
-            "dataset_note": "Synthetic dataset with learnable user/hotel structure; see ml/scripts/generate_synthetic_dataset.py.",
-        })
-        return stats
+        verified_path = self.project_root / "ml" / "evaluation" / "results" / "verified_evaluation.json"
+        if not verified_path.exists():
+            raise ResultsUnavailable(
+                f"{verified_path} not found. Run `python -m ml.evaluation.run_verified_evaluation`."
+            )
+        verified = json.loads(verified_path.read_text())
+        summary = verified["dataset_summary"]
+        integrity = verified["data_integrity"]
+        feasibility = verified["ranking_feasibility"]
+        synthetic = self._load("synthetic_evaluation.json")
+        benchmark_reviews = synthetic["dataset_info"]["total_reviews"]
+        return {
+            "total_reviews": summary["total_reviews"],
+            "total_users": summary["total_users"],
+            "total_hotels": summary["distinct_hotel_ids"],
+            "distinct_hotel_ids": summary["distinct_hotel_ids"],
+            "avg_rating": summary["avg_rating"],
+            "rating_std": summary["rating_std"],
+            "sparsity_percent": summary["sparsity_percent"],
+            "date_range": summary["date_range"],
+            "rating_distribution": summary["rating_distribution"],
+            "train_reviews": summary["train_reviews"],
+            "test_reviews": summary["test_reviews"],
+            "source_total_reviews": summary["total_reviews"],
+            "benchmark_total_reviews": benchmark_reviews,
+            "data_source": "TripAdvisor source dataset",
+            "hotel_id_is_unique_per_row": integrity["hotel_id_is_unique_per_row"],
+            "dataset_note": "Verified source dataset; distinct hotel IDs are unique per review in this dataset.",
+            "data_warning": (
+                "Each source review has its own hotel_id, so this dataset cannot measure repeated "
+                "user–hotel recommendation quality. Model-ranking benchmarks below use a separate "
+                f"synthetic dataset of {benchmark_reviews:,} reviews."
+                if feasibility["evaluable_users"] == 0
+                else None
+            ),
+        }
 
     def get_model_performance(self) -> Dict[str, Any]:
         data = self._load("synthetic_evaluation.json")

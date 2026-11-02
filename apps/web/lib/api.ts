@@ -208,6 +208,28 @@ export interface SubmittedReview {
   rating: number | null;
   text: string;
   sentiment: SentimentResult;
+  created_at: string | null;
+}
+
+export interface HotelReview {
+  id: string;
+  rating: number | null;
+  text: string;
+  sentiment_label: "negative" | "neutral" | "positive";
+  sentiment_score: number;
+  created_at: string | null;
+  source: "catalog" | "user";
+  is_synthetic: boolean;
+}
+
+export async function fetchHotelReviews(hotelId: string): Promise<HotelReview[]> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/reviews/hotel/${encodeURIComponent(hotelId)}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await errorDetail(res));
+  const body = await res.json();
+  if (!Array.isArray(body?.data)) throw new Error("The reviews response was invalid.");
+  return body.data;
 }
 
 export async function submitReview(
@@ -268,12 +290,16 @@ export async function fetchHotelDetail(hotelId: string): Promise<Hotel | null> {
 
 export interface DatasetSummary {
   total_reviews: number;
+  source_total_reviews?: number | null;
+  benchmark_total_reviews?: number | null;
   total_users: number;
   total_hotels: number;
+  distinct_hotel_ids?: number;
   avg_rating: number;
   rating_std: number;
   sparsity_percent: number;
   date_range?: { start: string; end: string };
+  rating_distribution?: { rating: string; count: number; percentage: number }[];
   hotel_id_is_unique_per_row?: boolean;
   data_warning?: string;
 }

@@ -121,10 +121,24 @@ def test_review_submission_runs_sentiment_model_and_feeds_history(client, user_t
     assert pos.json()["data"]["sentiment"]["label"] == "positive" and pos.json()["data"]["sentiment"]["score"] > 0.5
     assert neg.json()["data"]["sentiment"]["label"] == "negative" and neg.json()["data"]["sentiment"]["score"] < -0.5
     stored = client.get(f"/api/v1/reviews/hotel/{hotel_id}").json()["data"]
+    stored = [review for review in stored if review["source"] == "user"]
     assert {s["sentiment_label"] for s in stored} == {"positive", "negative"}
     after = client.post(REC, json={"top_n": 10, "model_type": "hybrid"}, headers=h).json()["data"]
     assert hotel_id not in [x["hotel_id"] for x in after["recommendations"]]     # already reviewed
     assert after["personalization"]["history_size"] == 1      # two reviews of one hotel -> one averaged entry
+
+
+def test_hotel_review_endpoint_includes_catalog_reviews(client):
+    response = client.get("/api/v1/reviews/hotel/hotel_0381")
+    assert response.status_code == 200, response.text
+
+    reviews = response.json()["data"]
+    catalog_reviews = [review for review in reviews if review["source"] == "catalog"]
+    assert len(catalog_reviews) == 120
+    assert all(review["is_synthetic"] for review in catalog_reviews)
+    assert all(review["text"] and review["rating"] in range(1, 6) for review in catalog_reviews)
+    assert all(review["sentiment_label"] in {"positive", "neutral", "negative"} for review in catalog_reviews)
+    assert all(review["created_at"] for review in catalog_reviews)
 
 
 def test_review_requires_auth_and_valid_hotel(client, user_token):

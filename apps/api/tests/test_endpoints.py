@@ -113,9 +113,15 @@ def test_analytics_endpoints_match_pipeline_output():
     import json
     root = Path(__file__).resolve().parents[3]
     stats = client.get("/api/v1/analytics/dataset-stats").json()["data"]
-    on_disk = json.loads((root / "data/processed/dataset_stats.json").read_text())
-    assert stats["total_reviews"] == on_disk["total_reviews"] and stats["avg_rating"] == on_disk["avg_rating"]
-    assert stats["hotel_id_is_unique_per_row"] is False
+    verified = json.loads((root / "ml/evaluation/results/verified_evaluation.json").read_text())
+    synthetic = json.loads((root / "ml/evaluation/results/synthetic_evaluation.json").read_text())
+    assert stats["total_reviews"] == verified["dataset_summary"]["total_reviews"] == 201295
+    assert stats["avg_rating"] == verified["dataset_summary"]["avg_rating"]
+    assert stats["total_users"] == verified["dataset_summary"]["total_users"]
+    assert stats["distinct_hotel_ids"] == verified["dataset_summary"]["distinct_hotel_ids"]
+    assert stats["benchmark_total_reviews"] == synthetic["dataset_info"]["total_reviews"] == 60181
+    assert stats["hotel_id_is_unique_per_row"] is True
+    assert "separate synthetic dataset" in stats["data_warning"]
 
     perf = client.get("/api/v1/analytics/model-performance").json()["data"]
     report = json.loads((root / "ml/evaluation/results/synthetic_evaluation.json").read_text())

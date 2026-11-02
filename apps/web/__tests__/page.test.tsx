@@ -34,6 +34,6 @@ describe('Home Page', () => {
     
     expect(screen.getAllByText(/50,780/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Indexed Properties/i)).toBeInTheDocument()
-    expect(screen.getAllByText(/201,382/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/201,295/i).length).toBeGreaterThan(0)
   })
 })
