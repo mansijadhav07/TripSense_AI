@@ -4,6 +4,8 @@
  * Connects the Next.js frontend to the FastAPI backend.
  */
 
+import { authenticatedApiFetch } from "./auth-api";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface Hotel {
@@ -94,6 +96,18 @@ export interface SentimentResult {
   probabilities: Record<string, number>;
 }
 
+export interface UserPreferences {
+  destination: string | null;
+  min_rating: number;
+  cleanliness_weight: number;
+  location_weight: number;
+  rooms_weight: number;
+  service_weight: number;
+  value_weight: number;
+  sleep_quality_weight: number;
+  travel_style: string;
+}
+
 async function errorDetail(res: Response): Promise<string> {
   try {
     const j = await res.json();
@@ -101,6 +115,29 @@ async function errorDetail(res: Response): Promise<string> {
   } catch {
     return res.statusText;
   }
+}
+
+export async function fetchUserPreferences(token: string): Promise<UserPreferences> {
+  const res = await authenticatedApiFetch(`${API_BASE_URL}/api/v1/users/me/preferences`, {
+    cache: "no-store",
+  }, token);
+  if (!res.ok) throw new Error(await errorDetail(res));
+  const body = await res.json();
+  return body.data;
+}
+
+export async function updateUserPreferences(
+  token: string,
+  preferences: UserPreferences,
+): Promise<UserPreferences> {
+  const res = await authenticatedApiFetch(`${API_BASE_URL}/api/v1/users/me/preferences`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(preferences),
+  }, token);
+  if (!res.ok) throw new Error(await errorDetail(res));
+  const body = await res.json();
+  return body.data;
 }
 
 export async function fetchRecommendations(params: RecommendationParams = {}): Promise<RecommendationResult> {
@@ -177,11 +214,11 @@ export async function submitReview(
   token: string,
   review: { hotel_id: string; text: string; rating?: number | null }
 ): Promise<SubmittedReview> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/reviews`, {
+  const res = await authenticatedApiFetch(`${API_BASE_URL}/api/v1/reviews`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(review),
-  });
+  }, token);
   if (!res.ok) throw new Error(await errorDetail(res));
   return (await res.json()).data;
 }
@@ -189,12 +226,12 @@ export async function submitReview(
 export async function setHotelSaved(token: string, hotelId: string, saved: boolean): Promise<void> {
   const url = `${API_BASE_URL}/api/v1/users/me/saved-hotels`;
   const res = saved
-    ? await fetch(url, {
+    ? await authenticatedApiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ hotel_id: hotelId }),
       })
-    : await fetch(`${url}/${encodeURIComponent(hotelId)}`, {
+    : await authenticatedApiFetch(`${url}/${encodeURIComponent(hotelId)}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -203,14 +240,14 @@ export async function setHotelSaved(token: string, hotelId: string, saved: boole
 
 export async function fetchSavedHotelIds(token: string): Promise<string[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/users/me/saved-hotels`, {
+    const res = await authenticatedApiFetch(`${API_BASE_URL}/api/v1/users/me/saved-hotels`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     });
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error(await errorDetail(res));
     return ((await res.json()).data ?? []).map((s: { hotel_id: string }) => s.hotel_id);
-  } catch {
-    return [];
+  } catch (error) {
+    throw error;
   }
 }
 

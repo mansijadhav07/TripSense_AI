@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useTransition, Suspense, useCallback } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   fetchRecommendations,
   fetchPersonas,
   fetchSavedHotelIds,
+  fetchUserPreferences,
   setHotelSaved,
   Recommendation,
   Personalization,
@@ -17,9 +18,11 @@ import { useAuth } from "@/lib/auth";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function DiscoverContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialDestination = searchParams.get("destination") || "";
   const { token } = useAuth();
+  const [preferencesLoadedFor, setPreferencesLoadedFor] = useState<string | null>(null);
 
   const [destination, setDestination] = useState(initialDestination);
   const [minRating, setMinRating] = useState(3.0);
@@ -42,6 +45,8 @@ function DiscoverContent() {
   const [error, setError] = useState<string | null>(null);
   const [dataSource, setDataSource] = useState<string | undefined>();
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
+  const [savedError, setSavedError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const loadRecs = useCallback(
@@ -100,18 +105,60 @@ function DiscoverContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (token) fetchSavedHotelIds(token).then((ids) => setSavedIds(new Set(ids)));
+    if (!token) return;
+
+    let active = true;
+    fetchUserPreferences(token)
+      .then((preferences) => {
+        if (!active) return;
+        if (!initialDestination && preferences.destination) setDestination(preferences.destination);
+        setMinRating(preferences.min_rating);
+        setWeights({
+          cleanliness: preferences.cleanliness_weight,
+          service: preferences.service_weight,
+          location: preferences.location_weight,
+          rooms: preferences.rooms_weight,
+          value: preferences.value_weight,
+        });
+        setStyles(TRAVEL_STYLES.includes(preferences.travel_style as (typeof TRAVEL_STYLES)[number])
+          ? [preferences.travel_style]
+          : []);
+      })
+      .catch((e: unknown) => {
+        console.error("Could not load recommendation preferences:", e);
+        if (active) setSavedError("Could not load your recommendation preferences.");
+      })
+      .finally(() => {
+        if (active) setPreferencesLoadedFor(token);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, initialDestination]);
+
+  useEffect(() => {
+    if (token) {
+      fetchSavedHotelIds(token)
+        .then((ids) => setSavedIds(new Set(ids)))
+        .catch((e: unknown) => {
+          console.error("Could not load saved hotels:", e);
+          setSavedError("Could not load your saved hotels. Please try again.");
+        });
+    }
   }, [token]);
 
   // Load on mount and whenever the ?destination= query param changes.
   // Filter state is intentionally read once per navigation, not on every edit.
   const urlDest = searchParams.get("destination") || "";
   useEffect(() => {
+    if (token && preferencesLoadedFor !== token) return;
+    const targetDestination = urlDest || destination;
+    // This effect intentionally reloads recommendations when profile settings become available.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDestination(urlDest);
-    loadRecs(urlDest);
+    loadRecs(targetDestination);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlDest, token]);   // token is restored from localStorage after mount: reload so history is used
+  }, [urlDest, token, preferencesLoadedFor]);   // restore profile settings before loading personalized results
 
   const handleApplyFilters = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,19 +174,41 @@ function DiscoverContent() {
     });
   };
 
-  const toggleSave = (hotelId: string) => {
-    if (token) {
-      setHotelSaved(token, hotelId, !savedIds.has(hotelId)).catch((e) => console.error("save failed", e));
+  const toggleSave = async (hotelId: string) => {
+    if (!token) {
+      router.push("/login");
+      return;
     }
-    setSavedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(hotelId)) {
-        next.delete(hotelId);
-      } else {
-        next.add(hotelId);
-      }
-      return next;
-    });
+    if (savingIds.has(hotelId)) return;
+
+    const wasSaved = savedIds.has(hotelId);
+    const next = new Set(savedIds);
+    if (wasSaved) {
+      next.delete(hotelId);
+    } else {
+      next.add(hotelId);
+    }
+    setSavedIds(next);
+    setSavingIds((prev) => new Set(prev).add(hotelId));
+    setSavedError(null);
+    try {
+      await setHotelSaved(token, hotelId, !wasSaved);
+    } catch (e) {
+      console.error("Could not update saved hotel:", e);
+      setSavedIds((prev) => {
+        const restored = new Set(prev);
+        if (wasSaved) restored.add(hotelId);
+        else restored.delete(hotelId);
+        return restored;
+      });
+      setSavedError(e instanceof Error ? e.message : "Could not update saved hotel.");
+    } finally {
+      setSavingIds((prev) => {
+        const nextSaving = new Set(prev);
+        nextSaving.delete(hotelId);
+        return nextSaving;
+      });
+    }
   };
 
   return (
@@ -294,6 +363,11 @@ function DiscoverContent() {
 
         {/* Results Grid */}
         <div className="lg:col-span-3">
+          {savedError && (
+            <p role="alert" className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-300">
+              {savedError}
+            </p>
+          )}
           {dataSource === "synthetic-demo" && (
             <div role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-300">
               Demo mode: these hotels are synthetic sample data, not real properties.
@@ -438,13 +512,14 @@ function DiscoverContent() {
                     <div className="mt-6 pt-4 border-t border-slate-800/60 flex items-center justify-between">
                       <button
                         onClick={() => toggleSave(rec.hotel_id)}
+                        disabled={savingIds.has(rec.hotel_id)}
                         className={`text-xs px-3 py-1.5 rounded-lg border transition ${
                           isSaved
                             ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
                             : "text-slate-400 hover:text-white border-slate-800 hover:bg-slate-800/60"
-                        }`}
+                        } disabled:opacity-50`}
                       >
-                        {isSaved ? "♥ Saved" : "♡ Save Hotel"}
+                        {savingIds.has(rec.hotel_id) ? "Saving…" : isSaved ? "♥ Saved" : "♡ Save Hotel"}
                       </button>
 
                       <div className="flex items-center gap-2">

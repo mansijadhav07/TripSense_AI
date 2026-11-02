@@ -76,8 +76,20 @@ async def generate_recommendations(
             for sv in db.query(SavedHotel).filter(SavedHotel.user_id == current_user.id).all():
                 history.setdefault(sv.hotel_id, SAVED_IMPLICIT_RATING)
             pref = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
-            if pref and pref.travel_style and not travel_styles:
-                travel_styles = [pref.travel_style]
+            if pref:
+                destination = destination or pref.destination
+                if min_rating is None:
+                    min_rating = float(pref.min_rating) if pref.min_rating is not None else None
+                if aspect_weights is None:
+                    aspect_weights = {
+                        "cleanliness": float(pref.cleanliness_weight),
+                        "service": float(pref.service_weight),
+                        "location": float(pref.location_weight),
+                        "rooms": float(pref.rooms_weight),
+                        "value": float(pref.value_weight),
+                    }
+                if pref.travel_style and not travel_styles:
+                    travel_styles = [pref.travel_style]
 
         result = service.generate_recommendations(
             top_n=request.top_n,

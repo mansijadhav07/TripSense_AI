@@ -135,6 +135,43 @@ def test_review_requires_auth_and_valid_hotel(client, user_token):
     assert client.post("/api/v1/reviews", headers=h, json={**body, "rating": 9}).status_code == 422
 
 
+def test_user_preferences_roundtrip_and_personalize_recommendations(client, user_token):
+    headers = {"Authorization": f"Bearer {user_token}"}
+    defaults = client.get("/api/v1/users/me/preferences", headers=headers)
+    assert defaults.status_code == 200
+    assert defaults.json()["data"]["min_rating"] == 3.0
+
+    updated = {
+        "destination": "Tokyo",
+        "min_rating": 4.2,
+        "travel_style": "luxury",
+        "cleanliness_weight": 2.5,
+        "location_weight": 1.0,
+        "rooms_weight": 1.0,
+        "service_weight": 1.0,
+        "value_weight": 1.0,
+        "sleep_quality_weight": 1.0,
+    }
+    saved = client.put("/api/v1/users/me/preferences", json=updated, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["data"]["destination"] == "Tokyo"
+
+    persisted = client.get("/api/v1/users/me/preferences", headers=headers).json()["data"]
+    assert persisted["min_rating"] == 4.2
+    assert persisted["travel_style"] == "luxury"
+    assert persisted["cleanliness_weight"] == 2.5
+
+    recs = client.post("/api/v1/recommendations/generate", json={"top_n": 10}, headers=headers)
+    assert recs.status_code == 200, recs.text
+    hotels = recs.json()["data"]["recommendations"]
+    assert hotels
+    assert all(h["location"] == "Tokyo" and h["avg_rating"] >= 4.2 for h in hotels)
+
+    cleared = client.put("/api/v1/users/me/preferences", json={**updated, "destination": None}, headers=headers)
+    assert cleared.status_code == 200
+    assert cleared.json()["data"]["destination"] is None
+
+
 def test_sentiment_analyze_endpoint_probabilities(client):
     r = client.post("/api/v1/reviews/analyze", json={"text": "Lovely hotel, amazing staff and a great breakfast!"})
     d = r.json()["data"]

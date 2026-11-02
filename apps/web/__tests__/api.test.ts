@@ -1,5 +1,18 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { fetchRecommendations, fetchAnalyticsOverview } from "@/lib/api";
+import {
+  authenticatedApiFetch,
+  fetchCurrentUser,
+  getAuthHeaders,
+  normalizeAccessToken,
+} from "@/lib/auth-api";
+import {
+  fetchRecommendations,
+  fetchAnalyticsOverview,
+  fetchUserPreferences,
+  setHotelSaved,
+  submitReview,
+  updateUserPreferences,
+} from "@/lib/api";
 
 const json = (body: unknown, status = 200) =>
   Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
@@ -35,5 +48,67 @@ describe("api client never fabricates data", () => {
     vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await fetchAnalyticsOverview()).toBeNull();
+  });
+
+  it("normalizes persisted bearer tokens before sending requests", async () => {
+    expect(normalizeAccessToken(" Bearer saved-token ")).toBe("saved-token");
+    expect(new Headers(getAuthHeaders("Bearer saved-token")).get("Authorization")).toBe("Bearer saved-token");
+  });
+
+  it("uses the current session to save hotels and submit reviews", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ success: true }))
+      .mockResolvedValueOnce(json({ success: true }))
+      .mockResolvedValueOnce(json({ data: { id: "r1", sentiment: { label: "positive" } } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await setHotelSaved("valid-token", "hotel-1", true);
+    await setHotelSaved("valid-token", "hotel-1", false);
+    await submitReview("valid-token", { hotel_id: "hotel-1", text: "Great stay!" });
+
+    for (const [url, options] of fetchMock.mock.calls) {
+      expect(url).toContain("/api/v1/");
+      expect(new Headers(options.headers).get("Authorization")).toBe("Bearer valid-token");
+    }
+  });
+
+  it("loads and saves profile preferences through authenticated endpoints", async () => {
+    const preferences = {
+      destination: "Tokyo",
+      min_rating: 4.2,
+      travel_style: "luxury",
+      cleanliness_weight: 2,
+      location_weight: 1,
+      rooms_weight: 1,
+      service_weight: 1,
+      value_weight: 1,
+      sleep_quality_weight: 1,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ data: preferences }))
+      .mockResolvedValueOnce(json({ data: preferences }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchUserPreferences("valid-token")).resolves.toEqual(preferences);
+    await expect(updateUserPreferences("valid-token", preferences)).resolves.toEqual(preferences);
+
+    expect(fetchMock.mock.calls[0][0]).toContain("/api/v1/users/me/preferences");
+    expect(new Headers(fetchMock.mock.calls[0][1].headers).get("Authorization")).toBe("Bearer valid-token");
+    expect(fetchMock.mock.calls[1][1].method).toBe("PUT");
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual(preferences);
+  });
+
+  it("clears stale sessions after protected requests are rejected", async () => {
+    const dispatch = vi.spyOn(window, "dispatchEvent");
+    vi.stubGlobal("fetch", vi.fn(() => json({ detail: "Could not validate credentials" }, 401)));
+
+    await expect(authenticatedApiFetch("http://localhost/protected", {}, "expired-token"))
+      .rejects.toThrow("Your session has expired");
+    await expect(setHotelSaved("expired-token", "hotel-1", true))
+      .rejects.toThrow("Your session has expired");
+    await expect(submitReview("expired-token", { hotel_id: "hotel-1", text: "Great stay!" }))
+      .rejects.toThrow("Your session has expired");
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "tripsense:auth-expired" }));
+    expect(await fetchCurrentUser("expired-token")).toBeNull();
   });
 });

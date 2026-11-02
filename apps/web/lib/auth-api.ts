@@ -28,6 +28,16 @@ export interface AuthResponse {
   };
 }
 
+export interface AuthenticatedUser {
+  id: string;
+  email: string;
+  created_at?: string;
+}
+
+export function normalizeAccessToken(token: string): string {
+  return token.trim().replace(/^Bearer\s+/i, "");
+}
+
 export async function signup(email: string, password: string): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/register`, {
     method: "POST",
@@ -64,7 +74,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
  * Get authentication headers for authenticated requests
  */
 export function getAuthHeaders(token?: string | null): HeadersInit {
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
 
@@ -72,6 +82,7 @@ export function getAuthHeaders(token?: string | null): HeadersInit {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  if (token) headers.Authorization = `Bearer ${normalizeAccessToken(token)}`;
   return headers;
 }
 
@@ -92,4 +103,32 @@ export async function authenticatedFetch(
     ...options,
     headers,
   });
+}
+
+export async function fetchCurrentUser(token: string): Promise<AuthenticatedUser | null> {
+  const res = await authenticatedFetch(`${API_BASE_URL}/api/v1/auth/me`, {
+    cache: "no-store",
+  }, token);
+
+  if (res.status === 401 || res.status === 403) return null;
+  if (!res.ok) {
+    throw new Error(`Could not restore session (${res.status} ${res.statusText}).`);
+  }
+  return (await res.json()) as AuthenticatedUser;
+}
+
+export async function authenticatedApiFetch(
+  url: string,
+  options: RequestInit = {},
+  token?: string | null
+): Promise<Response> {
+  const headerToken = new Headers(options.headers).get("Authorization")?.replace(/^Bearer\s+/i, "");
+  const res = await authenticatedFetch(url, options, token ?? headerToken);
+  if (res.status === 401 || res.status === 403) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("tripsense:auth-expired"));
+    }
+    throw new Error("Your session has expired. Please sign in again to continue.");
+  }
+  return res;
 }

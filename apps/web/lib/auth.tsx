@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { fetchCurrentUser, normalizeAccessToken } from "./auth-api";
 
 export interface User {
   id: string;
@@ -29,25 +30,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check localStorage on mount
-    // Wrapped in setTimeout to avoid MetaMask extension interference
-    const timer = setTimeout(() => {
+    let active = true;
+
+    const clearStoredSession = () => {
+      localStorage.removeItem("tripsense_token");
+      localStorage.removeItem("tripsense_user");
+      if (active) {
+        setToken(null);
+        setUser(null);
+      }
+    };
+
+    const handleExpiredSession = () => clearStoredSession();
+    window.addEventListener("tripsense:auth-expired", handleExpiredSession);
+
+    const restoreSession = async () => {
       try {
         const savedToken = localStorage.getItem("tripsense_token");
         const savedUser = localStorage.getItem("tripsense_user");
-        if (savedToken && savedUser) {
-          setToken(savedToken);
-          setUser(JSON.parse(savedUser));
+        if (!savedToken || !savedUser) {
+          clearStoredSession();
+          return;
         }
-      } catch (e) {
-        // Silently handle errors from browser extensions
-        if (!(e instanceof Error && e.message.includes("addListener"))) {
-          console.warn("Could not read auth state from storage", e);
+
+        const normalizedToken = normalizeAccessToken(savedToken);
+        let cachedUser: User;
+        try {
+          cachedUser = JSON.parse(savedUser) as User;
+        } catch {
+          clearStoredSession();
+          return;
         }
+        if (!normalizedToken || !cachedUser?.email) {
+          clearStoredSession();
+          return;
+        }
+
+        try {
+          const currentUser = await fetchCurrentUser(normalizedToken);
+          if (!currentUser) {
+            clearStoredSession();
+            return;
+          }
+          if (active) {
+            setToken(normalizedToken);
+            setUser(currentUser);
+            localStorage.setItem("tripsense_token", normalizedToken);
+            localStorage.setItem("tripsense_user", JSON.stringify(currentUser));
+          }
+        } catch (error) {
+          console.warn("Could not verify the saved session; retaining it until the API is reachable.", error);
+          if (active) {
+            setToken(normalizedToken);
+            setUser(cachedUser);
+          }
+        }
+      } catch (error) {
+        console.warn("Could not restore authentication from browser storage.", error);
       }
-    }, 0);
-    
-    return () => clearTimeout(timer);
+    };
+
+    void restoreSession();
+    return () => {
+      active = false;
+      window.removeEventListener("tripsense:auth-expired", handleExpiredSession);
+    };
   }, []);
 
   const login = (newToken: string, newUser: User) => {

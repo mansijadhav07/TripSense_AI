@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-16T17:07:06Z",
+  "timestamp": "2026-10-29T12:44:55Z",
   "environment": {
     "spark_version": "3.5.0",
     "cores": "local[*]",
@@ -9,24 +9,24 @@
     {
       "dataset_size": 1000,
       "operation": "Hotel Aggregations (mean, count, countDistinct)",
-      "pandas_seconds": 0.0125,
-      "spark_seconds": 0.8328,
-      "speedup": 0.02,
+      "pandas_seconds": 0.006,
+      "spark_seconds": 0.8824,
+      "speedup": 0.01,
       "winner": "Pandas (overhead)"
     },
     {
       "dataset_size": 10000,
       "operation": "Hotel Aggregations (mean, count, countDistinct)",
-      "pandas_seconds": 0.0072,
-      "spark_seconds": 0.217,
+      "pandas_seconds": 0.0078,
+      "spark_seconds": 0.2269,
       "speedup": 0.03,
       "winner": "Pandas (overhead)"
     },
     {
       "dataset_size": 50000,
       "operation": "Hotel Aggregations (mean, count, countDistinct)",
-      "pandas_seconds": 0.0363,
-      "spark_seconds": 0.3549,
+      "pandas_seconds": 0.0346,
+      "spark_seconds": 0.3597,
       "speedup": 0.1,
       "winner": "Spark (scalability)"
     }

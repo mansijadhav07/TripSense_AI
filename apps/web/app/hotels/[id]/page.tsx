@@ -102,6 +102,8 @@ function HotelDetailContent() {
   const [hotel, setHotel] = useState<HotelDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [savedBusy, setSavedBusy] = useState(false);
+  const [savedError, setSavedError] = useState<string | null>(null);
   const { token } = useAuth();
   const [reviewText, setReviewText] = useState("");
   const [reviewRating, setReviewRating] = useState<number | null>(null);
@@ -110,13 +112,33 @@ function HotelDetailContent() {
   const [reviewResult, setReviewResult] = useState<{ sentiment: SentimentResult; stored: boolean } | null>(null);
 
   useEffect(() => {
-    if (token && hotelId) fetchSavedHotelIds(token).then((ids) => setSaved(ids.includes(hotelId)));
+    if (!token || !hotelId) return;
+    fetchSavedHotelIds(token)
+      .then((ids) => setSaved(ids.includes(hotelId)))
+      .catch((error: unknown) => {
+        console.error("Could not load saved hotel status:", error);
+        setSavedError("Could not load your saved hotels. Please try again.");
+      });
   }, [token, hotelId]);
 
-  const toggleSaved = () => {
+  const toggleSaved = async () => {
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
     const next = !saved;
-    setSaved(next);
-    if (token) setHotelSaved(token, hotelId, next).catch(() => setSaved(!next));
+    setSavedBusy(true);
+    setSavedError(null);
+    try {
+      await setHotelSaved(token, hotelId, next);
+      setSaved(next);
+    } catch (error) {
+      console.error("Could not update saved hotel:", error);
+      setSavedError(error instanceof Error ? error.message : "Could not update saved hotel.");
+    } finally {
+      setSavedBusy(false);
+    }
   };
 
   const handleReview = async (e: React.FormEvent) => {
@@ -252,13 +274,14 @@ function HotelDetailContent() {
               <div className="flex gap-2">
                 <button
                   onClick={toggleSaved}
+                  disabled={savedBusy}
                   className={`px-4 py-2 rounded-xl text-xs font-semibold border transition ${
                     saved
                       ? "bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25"
                       : "text-slate-400 border-slate-700 hover:text-white hover:bg-slate-800/60"
-                  }`}
+                  } disabled:opacity-50`}
                 >
-                  {saved ? "♥ Saved" : "♡ Save"}
+                  {savedBusy ? "Saving…" : saved ? "♥ Saved" : "♡ Save"}
                 </button>
                 <button
                   onClick={() => router.push("/discover")}
@@ -434,6 +457,9 @@ function HotelDetailContent() {
                   </button>
                 </div>
               </form>
+              {savedError && (
+                <p role="alert" className="mt-4 text-sm text-rose-300">{savedError}</p>
+              )}
               {reviewError && (
                 <p role="alert" className="mt-4 text-sm text-rose-300">{reviewError}</p>
               )}
@@ -491,9 +517,10 @@ function HotelDetailContent() {
                   </Link>
                   <button
                     onClick={toggleSaved}
-                    className="px-5 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 transition hover:shadow-cyan-500/40 active:scale-[0.98] whitespace-nowrap"
+                    disabled={savedBusy}
+                    className="px-5 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-lg shadow-cyan-500/20 transition hover:shadow-cyan-500/40 active:scale-[0.98] whitespace-nowrap disabled:opacity-50"
                   >
-                    {saved ? "♥ Saved to Profile" : "♡ Save to Profile"}
+                    {savedBusy ? "Saving…" : saved ? "♥ Saved to Profile" : "♡ Save to Profile"}
                   </button>
                 </div>
               </div>

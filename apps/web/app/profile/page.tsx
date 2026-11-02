@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
-import { setHotelSaved } from "@/lib/api";
+import { fetchUserPreferences, setHotelSaved, UserPreferences } from "@/lib/api";
+import { authenticatedApiFetch } from "@/lib/auth-api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -30,6 +31,8 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState<SavedHotel[]>([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [savedError, setSavedError] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -37,8 +40,11 @@ export default function ProfilePage() {
       setLoading(false);
       return;
     }
-    fetch(`${API_BASE_URL}/api/v1/users/me/saved-hotels`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => (r.ok ? r.json() : { data: [] }))
+    authenticatedApiFetch(`${API_BASE_URL}/api/v1/users/me/saved-hotels`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => {
+        if (!r.ok) throw new Error(`Could not load saved hotels (${r.status}).`);
+        return r.json();
+      })
       .then((json) =>
         setSaved(
           (json.data ?? []).map(
@@ -53,17 +59,37 @@ export default function ProfilePage() {
           )
         )
       )
-      .catch(() => setSaved([]))
+      .catch((error: unknown) => {
+        console.error("Could not load saved hotels:", error);
+        setSavedError(error instanceof Error ? error.message : "Could not load saved hotels.");
+      })
       .finally(() => setLoading(false));
   }, [token]);
 
-  const handleRemove = (hotelId: string) => {
+  useEffect(() => {
+    if (!token) return;
+    fetchUserPreferences(token)
+      .then(setPreferences)
+      .catch((error: unknown) => console.error("Could not load profile preferences:", error));
+  }, [token]);
+
+  const handleRemove = async (hotelId: string) => {
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
     setRemoving(hotelId);
-    if (token) setHotelSaved(token, hotelId, false).catch(() => undefined);
-    setTimeout(() => {
+    setSavedError(null);
+    try {
+      await setHotelSaved(token, hotelId, false);
       setSaved((prev) => prev.filter((h) => h.hotel_id !== hotelId));
+    } catch (error) {
+      console.error("Could not remove saved hotel:", error);
+      setSavedError(error instanceof Error ? error.message : "Could not remove saved hotel.");
+    } finally {
       setRemoving(null);
-    }, 400);
+    }
   };
 
   const handleSignOut = () => {
@@ -182,10 +208,18 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 {[
                   { label: "Preferred Model", value: "Hybrid Ensemble", icon: "🤖" },
-                  { label: "Top Aspect", value: "Cleanliness", icon: "✨" },
-                  { label: "Min Rating", value: "4.0 ★", icon: "⭐" },
-                  { label: "Preferred Style", value: "Business / Luxury", icon: "💼" },
-                  { label: "Budget Range", value: "Mid-High", icon: "💰" },
+                  { label: "Top Aspect", value: preferences
+                    ? Object.entries({
+                        Cleanliness: preferences.cleanliness_weight,
+                        Location: preferences.location_weight,
+                        Rooms: preferences.rooms_weight,
+                        Service: preferences.service_weight,
+                        Value: preferences.value_weight,
+                      }).sort((a, b) => b[1] - a[1])[0][0]
+                    : "Loading…", icon: "✨" },
+                  { label: "Min Rating", value: preferences ? `${preferences.min_rating.toFixed(1)} ★` : "Loading…", icon: "⭐" },
+                  { label: "Preferred Style", value: preferences?.travel_style ?? "Loading…", icon: "💼" },
+                  { label: "Destination", value: preferences?.destination || "Any", icon: "📍" },
                 ].map((pref) => (
                   <div key={pref.label} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
                     <span className="flex items-center gap-2 text-xs text-slate-400">
@@ -196,9 +230,12 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
-              <button className="mt-5 w-full py-2.5 rounded-xl text-xs font-semibold text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/10 transition">
+              <Link
+                href="/preferences"
+                className="mt-5 block w-full rounded-xl border border-cyan-500/20 py-2.5 text-center text-xs font-semibold text-cyan-400 transition hover:bg-cyan-500/10"
+              >
                 Edit Preferences →
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -250,6 +287,12 @@ export default function ProfilePage() {
               + Add More
             </Link>
           </div>
+
+          {savedError && (
+            <p role="alert" className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-sm text-rose-300">
+              {savedError}
+            </p>
+          )}
 
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -312,9 +355,10 @@ export default function ProfilePage() {
                     </Link>
                     <button
                       onClick={() => handleRemove(hotel.hotel_id)}
-                      className="px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/30 transition"
+                      disabled={removing === hotel.hotel_id}
+                      className="px-3 py-2 rounded-xl text-xs text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 border border-slate-700 hover:border-rose-500/30 transition disabled:opacity-50"
                     >
-                      ✕
+                      {removing === hotel.hotel_id ? "…" : "✕"}
                     </button>
                   </div>
                 </div>

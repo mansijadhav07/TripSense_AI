@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { fetchAnalyticsOverview } from "@/lib/api";
 
 export default function AnalyticsPage() {
@@ -10,6 +11,7 @@ export default function AnalyticsPage() {
 }
 
 async function AnalyticsContent() {
+  await connection();
   const data = await fetchAnalyticsOverview();
 
   if (!data) {

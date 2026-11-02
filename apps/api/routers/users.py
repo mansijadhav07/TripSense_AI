@@ -84,8 +84,7 @@ async def update_my_preferences(
         )
         db.add(pref)
     else:
-        if payload.destination is not None:
-            pref.destination = payload.destination
+        pref.destination = payload.destination
         if payload.min_rating is not None:
             pref.min_rating = payload.min_rating
         pref.cleanliness_weight = payload.cleanliness_weight
